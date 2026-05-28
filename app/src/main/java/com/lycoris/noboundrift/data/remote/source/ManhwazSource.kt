@@ -220,15 +220,4 @@ class ManhwazSource @Inject constructor(
         else -> MangaStatus.UNKNOWN
     }
 
-    /**
-     * Attempts to parse a date string from a Madara chapter date tooltip into epoch millis.
-     * Returns 0L on any parse failure rather than throwing.
-     */
-    private fun parseDateMillis(text: String): Long {
-        if (text.isBlank()) return 0L
-        return runCatching {
-            java.text.SimpleDateFormat("MMMM d, yyyy", java.util.Locale.ENGLISH)
-                .parse(text)?.time ?: 0L
-        }.getOrDefault(0L)
-    }
 }

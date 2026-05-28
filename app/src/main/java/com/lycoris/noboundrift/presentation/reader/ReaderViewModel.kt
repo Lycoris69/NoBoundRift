@@ -11,6 +11,7 @@ import com.lycoris.noboundrift.domain.usecase.MarkChapterReadUseCase
 import com.lycoris.noboundrift.presentation.navigation.Screen
 import com.lycoris.noboundrift.presentation.navigation.decodeFromNav
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -68,8 +69,6 @@ class ReaderViewModel @Inject constructor(
 
     fun onPageChanged(index: Int) {
         _uiState.update { it.copy(currentPageIndex = index) }
-        val pages = _uiState.value.pages
-        if (pages.isNotEmpty() && index >= pages.size - 1) onNearEnd()
     }
 
     fun retry() {
@@ -113,7 +112,8 @@ class ReaderViewModel @Inject constructor(
                     // Advance the pointer so the next call loads the chapter after this one
                     nextChapterUrl = findNextAfter(url)
                 }
-                .onFailure {
+                .onFailure { throwable ->
+                    if (throwable is CancellationException) throw throwable
                     _uiState.update { it.copy(isLoadingNextChapter = false) }
                 }
         }
@@ -126,6 +126,7 @@ class ReaderViewModel @Inject constructor(
                     _uiState.update { it.copy(pages = pages, isLoading = false) }
                 }
                 .onFailure { throwable ->
+                    if (throwable is CancellationException) throw throwable
                     _uiState.update {
                         it.copy(
                             isLoading = false,

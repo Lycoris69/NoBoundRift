@@ -38,6 +38,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -154,10 +157,14 @@ private fun WebtoonReader(
     }
 
     LaunchedEffect(listState, pages.size) {
-        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
-            .collect { lastVisible ->
-                if (pages.isNotEmpty() && lastVisible >= pages.size - 3) onNearEnd()
-            }
+        snapshotFlow {
+            val info = listState.layoutInfo.visibleItemsInfo
+            if (info.isEmpty()) null else info.last().index
+        }
+            .filterNotNull()
+            .map { lastVisible -> pages.isNotEmpty() && lastVisible >= pages.size - 3 }
+            .distinctUntilChanged()
+            .collect { nearEnd -> if (nearEnd) onNearEnd() }
     }
 
     LazyColumn(
@@ -209,9 +216,9 @@ private fun PageFlipReader(
 
     LaunchedEffect(pagerState, pages.size) {
         snapshotFlow { pagerState.currentPage }
-            .collect { current ->
-                if (pages.isNotEmpty() && current >= pages.size - 2) onNearEnd()
-            }
+            .map { current -> pages.isNotEmpty() && current >= pages.size - 2 }
+            .distinctUntilChanged()
+            .collect { nearEnd -> if (nearEnd) onNearEnd() }
     }
 
     HorizontalPager(
