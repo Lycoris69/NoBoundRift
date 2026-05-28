@@ -8,6 +8,7 @@ build/
 *.iml
 *.iws
 *.ipr
+.kotlin/
 local.properties
 
 # Build outputs
