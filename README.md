@@ -1,8 +1,11 @@
 # NoBoundRift
 
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+
 Personal Android manga and webtoon reader. Content is sourced by scraping third-party websites — no official APIs involved.
 
-> **Personal use only. Not intended for distribution.**
+> [!CAUTION]
+> **Personal use only. This app scrapes third-party websites without their consent. Do not distribute, publish, or use commercially.**
 
 ## Features
 
