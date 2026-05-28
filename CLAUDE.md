@@ -19,28 +19,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build & Run Commands
 
-Once the Android project is scaffolded:
-
 ```bash
 ./gradlew assembleDebug          # build debug APK
 ./gradlew installDebug           # install on connected device/emulator
 ./gradlew test                   # run unit tests (JVM)
 ./gradlew connectedAndroidTest   # run instrumented tests (requires device/emulator)
 ./gradlew lint                   # run Android lint
-./gradlew :app:testDebugUnitTest --tests "com.example.FooTest"  # single test class
+./gradlew :app:testDebugUnitTest --tests "com.lycoris.noboundrift.FooTest"  # single test class
 ```
 
 ## Architecture
 
 ### Source System
 
-Each supported website is a `Source` implementation. A source exposes:
-- `fetchMangaList()` — browse/search results
-- `fetchMangaDetails(url)` — title metadata (cover, synopsis, genres)
+Each supported website is a `Source` implementation (`data/remote/source/`). A source exposes:
+- `fetchMangaList(page)` — browse/search results
+- `fetchMangaDetail(url)` — title metadata (cover, synopsis, genres)
 - `fetchChapterList(mangaUrl)` — chapter index
 - `fetchPageList(chapterUrl)` — image URLs for a chapter
 
-Sources are registered in a `SourceManager` and selected by the user per-title. This is the primary extension point of the app — adding a new site means adding a new `Source` class.
+Registered sources (add new ones to `SourceManager`):
+
+| Class | ID | Site | Notes |
+|---|---|---|---|
+| `MangaDexSource` | 1 | mangadex.org | JSON REST API, not Jsoup |
+| `MangaReadSource` | 2 | mangaread.org | Madara/WordPress theme |
+| `ManhwazSource` | 3 | manhwaz.com | Madara/WordPress theme |
+
+To add a new source: create a class implementing `Source`, give it a unique `id`, add it as a Hilt `@Inject constructor`, and register it in `SourceManager`.
+
+**Madara/WordPress pattern** (MangaRead, Manhwaz): chapter lists require a two-step AJAX fetch — GET the manga page to extract `#manga-chapters-holder[data-id]`, then POST to `wp-admin/admin-ajax.php` with `action=manga_get_chapters&manga={postId}`.
 
 ### Data Flow
 
