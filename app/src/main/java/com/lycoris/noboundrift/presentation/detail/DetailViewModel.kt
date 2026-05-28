@@ -11,6 +11,8 @@ import com.lycoris.noboundrift.domain.repository.MangaRepository
 import com.lycoris.noboundrift.presentation.navigation.Screen
 import com.lycoris.noboundrift.presentation.navigation.decodeFromNav
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,6 +46,8 @@ class DetailViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<DetailUiState>(DetailUiState.Loading)
     val uiState: StateFlow<DetailUiState> = _uiState.asStateFlow()
 
+    private var loadJob: Job? = null
+
     init {
         loadDetail()
     }
@@ -67,7 +71,8 @@ class DetailViewModel @Inject constructor(
     }
 
     private fun loadDetail() {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _uiState.value = DetailUiState.Loading
             getMangaDetail(sourceId = sourceId, url = mangaUrl)
                 .onSuccess { manga ->
@@ -85,14 +90,17 @@ class DetailViewModel @Inject constructor(
                         isInLibrary = false,
                         isLoadingChapters = false,
                     )
-                    // Observe library state reactively — keeps the flag live across DB changes
-                    repository.isInLibrary(manga.id).collect { inLib ->
-                        _uiState.update { state ->
-                            (state as? DetailUiState.Success)?.copy(isInLibrary = inLib) ?: state
+                    // Child of loadJob — cancelled automatically when loadJob is cancelled
+                    launch {
+                        repository.isInLibrary(manga.id).collect { inLib ->
+                            _uiState.update { state ->
+                                (state as? DetailUiState.Success)?.copy(isInLibrary = inLib) ?: state
+                            }
                         }
                     }
                 }
                 .onFailure { throwable ->
+                    if (throwable is CancellationException) throw throwable
                     _uiState.value = DetailUiState.Error(
                         throwable.message ?: "Failed to load manga details"
                     )
