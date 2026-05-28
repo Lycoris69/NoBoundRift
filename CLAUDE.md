@@ -21,6 +21,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 ./gradlew assembleDebug          # build debug APK
+./gradlew assembleRelease        # build release APK (unsigned)
 ./gradlew installDebug           # install on connected device/emulator
 ./gradlew test                   # run unit tests (JVM)
 ./gradlew connectedAndroidTest   # run instrumented tests (requires device/emulator)
@@ -33,46 +34,55 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Source System
 
 Each supported website is a `Source` implementation (`data/remote/source/`). A source exposes:
-- `fetchMangaList(page)` — browse/search results
+- `fetchMangaList(page, query)` — browse or search results depending on whether query is blank
 - `fetchMangaDetail(url)` — title metadata (cover, synopsis, genres)
-- `fetchChapterList(mangaUrl)` — chapter index
+- `fetchChapterList(mangaUrl)` — chapter index, returned sorted ascending by chapter number
 - `fetchPageList(chapterUrl)` — image URLs for a chapter
 
 Registered sources (add new ones to `SourceManager`):
 
 | Class | ID | Site | Notes |
 |---|---|---|---|
-| `MangaDexSource` | 1 | mangadex.org | JSON REST API, not Jsoup |
 | `MangaReadSource` | 2 | mangaread.org | Madara/WordPress theme |
-| `ManhwazSource` | 3 | manhwaz.com | Madara/WordPress theme |
+| `ManhwazSource` | 3 | manhwaz.com | Custom site, similar CSS classes to Madara |
 
 To add a new source: create a class implementing `Source`, give it a unique `id`, add it as a Hilt `@Inject constructor`, and register it in `SourceManager`.
 
-**Madara/WordPress pattern** (MangaRead, Manhwaz): chapter lists require a two-step AJAX fetch — GET the manga page to extract `#manga-chapters-holder[data-id]`, then POST to `wp-admin/admin-ajax.php` with `action=manga_get_chapters&manga={postId}`.
+**Chapter loading (both sources):** Chapters are embedded directly in the manga page HTML — `li.wp-manga-chapter a`. No AJAX step needed despite the Madara-like markup. Do not add AJAX logic.
+
+**Search endpoints:**
+- MangaRead: `/?s={query}&post_type=wp-manga`, selector `.c-tabs-item__content .post-title h3 a`
+- Manhwaz: `/?s={query}&post_type=wp-manga`, selector `.page-item-detail .post-title h3 a`
 
 ### Data Flow
 
 ```
-Source (scraper) → Repository → ViewModel → Compose UI
+Source (scraper) → Repository → UseCase → ViewModel → Compose UI
                         ↕
-                    Room DB (library, progress, cache)
+                    Room DB (library, progress)
 ```
 
-The domain layer (use cases) sits between Repository and ViewModel. Repositories coordinate between the live scraper and the local Room database so the UI always has something to show while a network fetch is in progress.
+The domain layer (use cases) sits between Repository and ViewModel. Repositories coordinate between the live scraper and the local Room database.
 
 ### Reader
 
-The reader screen receives a list of image URLs from `fetchPageList()` and displays them via `LazyColumn` (webtoon/scroll mode) or `HorizontalPager` (manga/page mode). Images are loaded lazily with Coil.
+The reader receives image URLs from `fetchPageList()` and displays them via `LazyColumn` (webtoon/scroll mode) or `HorizontalPager` (manga/page mode). When the user nears the last page, the ViewModel fetches the next chapter's pages and appends them seamlessly. The full chapter list is fetched once on reader init and stored in `sortedChapters` to resolve `nextChapterUrl` without further network calls.
+
+### Navigation
+
+Routes use URL-encoded nav args — both `mangaUrl` and `chapterUrl` are full URLs passed through `encodeForNav()` / `decodeFromNav()`. The `ARG_MANGA_ID` arg on the Reader route holds the full manga page URL (not just the slug).
 
 ## Scraping Guidelines
 
-- All HTTP goes through a shared `OkHttpClient` with a realistic User-Agent header and cookie jar so sessions persist across requests.
-- Rate-limit requests per source to avoid bans (use a per-source semaphore or delay).
-- Jsoup selectors are fragile — isolate them inside the `Source` class so breakage is contained. Add a comment with the date when a selector was last verified.
-- Prefer relative URL resolution (`absUrl()`) over string concatenation when extracting links.
+- All HTTP goes through a shared `OkHttpClient` with a realistic User-Agent header and a HashMap-based `CookieJar`.
+- Jsoup selectors are fragile — isolate them inside the `Source` class. Add a comment with the date when a selector was last verified.
+- Prefer `absUrl()` over string concatenation when extracting links. Handle `//`-prefixed URLs by prepending `https:`.
+- All `Source` functions are `suspend` functions calling `withContext(Dispatchers.IO)`.
 
 ## Key Conventions
 
-- Scraper selectors live entirely inside each `Source` class — never leak raw HTML or CSS selectors into domain/UI layers.
-- Chapter URLs are stored as the canonical identifier in Room; re-fetching progress by URL is safe.
-- Image loading should never block the main thread; all `Source` functions are `suspend` functions called from `Dispatchers.IO`.
+- Scraper selectors live entirely inside each `Source` class — never leak them into domain/UI layers.
+- Chapter URLs are the canonical identifier for reading progress in Room.
+- `runCatching` wraps all scraper calls in the repository; `CancellationException` must be checked in `.onFailure` handlers and not treated as an error.
+- Browse list deduplicates by `id` (`distinctBy { it.id }`) before updating state to prevent duplicate-key crashes in `LazyVerticalGrid`.
+- `loadNextPage()` guards against firing during an initial page-1 load by checking `isLoading`.

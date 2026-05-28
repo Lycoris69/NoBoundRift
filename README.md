@@ -6,18 +6,19 @@ Personal Android manga and webtoon reader. Content is sourced by scraping third-
 
 ## Features
 
-- Browse and search manga/webtoon across multiple sources
+- Browse and search manga/webtoon from multiple sources
+- Manga detail page with chapter list — sortable oldest-first or newest-first
 - Two reading modes: webtoon scroll and page-by-page flip
-- Local library — save titles and track reading progress
-- Read status synced per chapter via local Room database
+- Auto-load next chapter when reaching the end of a chapter
+- Local library — bookmark titles and track reading progress
+- Chapter marked as read automatically at 80%+ progress
 
 ## Sources
 
-| Source | Type | Method |
+| Source | Site | Method |
 |--------|------|--------|
-| MangaDex | Manga | REST API (`api.mangadex.org`) |
-| MangaRead | Manga/Manhwa | Jsoup scraper |
-| Manhwaz | Manhwa | Jsoup scraper |
+| MangaRead | mangaread.org | Jsoup scraper |
+| Manhwaz | manhwaz.com | Jsoup scraper |
 
 ## Stack
 
@@ -33,8 +34,13 @@ Personal Android manga and webtoon reader. Content is sourced by scraping third-
 Requires Android Studio or a JDK with the Android SDK configured.
 
 ```bash
-./gradlew assembleDebug      # build APK
+./gradlew assembleDebug      # build debug APK
+./gradlew assembleRelease    # build release APK
 ./gradlew installDebug       # install on connected device/emulator
 ```
 
 minSdk 26 · targetSdk 35
+
+## Releases
+
+Pre-built APKs are available on the [Releases](https://github.com/Lycoris69/NoBoundRift/releases) page. Enable "Install from unknown sources" on your device before installing.
