@@ -12,9 +12,15 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,28 +43,59 @@ fun BrowseScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    when {
-        uiState.isLoading -> {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+    Column(modifier = Modifier.fillMaxSize()) {
+        SearchBar(
+            query = uiState.searchQuery,
+            onQueryChange = viewModel::onSearchQueryChange,
+        )
+
+        when {
+            uiState.isLoading -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+
+            uiState.error != null && uiState.manga.isEmpty() -> {
+                ErrorState(
+                    message = uiState.error!!,
+                    onRetry = viewModel::retry,
+                )
+            }
+
+            else -> {
+                BrowseGrid(
+                    uiState = uiState,
+                    onMangaClick = onMangaClick,
+                    onLoadMore = viewModel::loadNextPage,
+                )
             }
         }
-
-        uiState.error != null && uiState.manga.isEmpty() -> {
-            ErrorState(
-                message = uiState.error!!,
-                onRetry = viewModel::retry,
-            )
-        }
-
-        else -> {
-            BrowseGrid(
-                uiState = uiState,
-                onMangaClick = onMangaClick,
-                onLoadMore = viewModel::loadNextPage,
-            )
-        }
     }
+}
+
+@Composable
+private fun SearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        placeholder = { Text("Search…") },
+        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = { onQueryChange("") }) {
+                    Icon(Icons.Default.Close, contentDescription = "Clear")
+                }
+            }
+        },
+        singleLine = true,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    )
 }
 
 @Composable

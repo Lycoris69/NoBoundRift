@@ -7,6 +7,8 @@ import com.lycoris.noboundrift.domain.model.MangaPreview
 import com.lycoris.noboundrift.domain.usecase.GetMangaListUseCase
 import com.lycoris.noboundrift.presentation.navigation.Screen
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,6 +23,7 @@ data class BrowseUiState(
     val error: String? = null,
     val currentPage: Int = 1,
     val canLoadMore: Boolean = true,
+    val searchQuery: String = "",
 )
 
 @HiltViewModel
@@ -50,15 +53,56 @@ class BrowseViewModel @Inject constructor(
         loadPage(state.currentPage)
     }
 
+    /**
+     * Called whenever the search field value changes. Resets the list to page 1 and
+     * debounces the network call by 400 ms so we don't fire on every keystroke.
+     *
+     * Both [searchJob] (the debounce delay) and [loadJob] (any in-flight network call
+     * from a previous search) are cancelled so only one request is ever in flight.
+     */
+    fun onSearchQueryChange(query: String) {
+        _uiState.update {
+            it.copy(
+                searchQuery = query,
+                manga = emptyList(),
+                currentPage = 1,
+                canLoadMore = true,
+            )
+        }
+        searchJob?.cancel()
+        loadJob?.cancel()
+        searchJob = viewModelScope.launch {
+            delay(400)
+            loadPage(page = 1)
+        }
+    }
+
+    private var searchJob: Job? = null
+
+    // Tracks the active page-load coroutine so it can be cancelled when a new search
+    // fires before the previous network call completes. Without this, two concurrent
+    // loadPage jobs can interleave their _uiState.update calls producing stale results.
+    private var loadJob: Job? = null
+
     private fun loadPage(page: Int) {
-        viewModelScope.launch {
+        // Snapshot the query synchronously before launching — guarantees the launched
+        // coroutine always uses the query that was current at call-site, not whatever
+        // the user has typed by the time the coroutine is scheduled.
+        val querySnapshot = _uiState.value.searchQuery
+
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             if (page == 1) {
                 _uiState.update { it.copy(isLoading = true, error = null) }
             } else {
                 _uiState.update { it.copy(isLoadingMore = true) }
             }
 
-            getMangaList(sourceId = sourceId, page = page)
+            getMangaList(
+                sourceId = sourceId,
+                page = page,
+                query = querySnapshot,
+            )
                 .onSuccess { newItems ->
                     _uiState.update { state ->
                         val combined = if (page == 1) newItems else state.manga + newItems
@@ -67,12 +111,13 @@ class BrowseViewModel @Inject constructor(
                             isLoading = false,
                             isLoadingMore = false,
                             currentPage = page,
-                            // Assume no more pages if the source returned fewer than 20 items
-                            canLoadMore = newItems.size >= 20,
+                            canLoadMore = newItems.isNotEmpty(),
                         )
                     }
                 }
                 .onFailure { throwable ->
+                    // CancellationException is rethrown by runCatching, so it will never
+                    // arrive here — .onFailure only receives real errors.
                     _uiState.update {
                         it.copy(
                             isLoading = false,

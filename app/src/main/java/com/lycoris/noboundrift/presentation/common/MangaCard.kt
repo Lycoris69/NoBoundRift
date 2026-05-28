@@ -56,8 +56,8 @@ fun MangaCard(
                     .aspectRatio(2f / 3f)
                     .background(
                         Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
-                            startY = 0.4f * Float.MAX_VALUE, // gradient starts 40% down
+                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f)),
+                            startY = 0.65f * Float.MAX_VALUE,
                         )
                     )
             )
