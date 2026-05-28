@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -98,13 +99,16 @@ fun ReaderScreen(
                 when (uiState.readerMode) {
                     ReaderMode.WEBTOON -> WebtoonReader(
                         pages = uiState.pages,
+                        isLoadingNextChapter = uiState.isLoadingNextChapter,
                         onPageVisible = viewModel::onPageChanged,
+                        onNearEnd = viewModel::onNearEnd,
                         modifier = centerClickModifier,
                     )
                     ReaderMode.PAGE_FLIP -> PageFlipReader(
                         pages = uiState.pages,
                         currentPage = uiState.currentPageIndex,
                         onPageChanged = viewModel::onPageChanged,
+                        onNearEnd = viewModel::onNearEnd,
                         modifier = centerClickModifier,
                     )
                 }
@@ -137,15 +141,23 @@ fun ReaderScreen(
 @Composable
 private fun WebtoonReader(
     pages: List<Page>,
+    isLoadingNextChapter: Boolean,
     onPageVisible: (Int) -> Unit,
+    onNearEnd: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
 
-    // Report the first fully-visible item index as current page
     LaunchedEffect(listState) {
         snapshotFlow { listState.firstVisibleItemIndex }
             .collect { onPageVisible(it) }
+    }
+
+    LaunchedEffect(listState, pages.size) {
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
+            .collect { lastVisible ->
+                if (pages.isNotEmpty() && lastVisible >= pages.size - 3) onNearEnd()
+            }
     }
 
     LazyColumn(
@@ -158,6 +170,21 @@ private fun WebtoonReader(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+        if (isLoadingNextChapter) {
+            item(key = "next-chapter-loader") {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 24.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(36.dp),
+                        color = Color.White,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -168,6 +195,7 @@ private fun PageFlipReader(
     pages: List<Page>,
     currentPage: Int,
     onPageChanged: (Int) -> Unit,
+    onNearEnd: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val pagerState = rememberPagerState(
@@ -175,9 +203,15 @@ private fun PageFlipReader(
         pageCount = { pages.size },
     )
 
-    // Sync pager position → ViewModel
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.currentPage }.collect { onPageChanged(it) }
+    }
+
+    LaunchedEffect(pagerState, pages.size) {
+        snapshotFlow { pagerState.currentPage }
+            .collect { current ->
+                if (pages.isNotEmpty() && current >= pages.size - 2) onNearEnd()
+            }
     }
 
     HorizontalPager(

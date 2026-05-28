@@ -35,7 +35,7 @@ sealed class Screen(val route: String) {
         const val ARG_MANGA_ID = "mangaId"
         const val ARG_CHAPTER_URL = "chapterUrl"
         fun createRoute(sourceId: Long, mangaId: String, chapterUrl: String): String =
-            "reader/$sourceId/$mangaId/${chapterUrl.encodeForNav()}"
+            "reader/$sourceId/${mangaId.encodeForNav()}/${chapterUrl.encodeForNav()}"
     }
 }
 
