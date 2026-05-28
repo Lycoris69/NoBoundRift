@@ -69,7 +69,7 @@ fun NoBoundRiftNavHost() {
                             } == true,
                             onClick = {
                                 val route = when (item.screen) {
-                                    is Screen.Browse -> Screen.Browse.createRoute(sourceId = 1L)
+                                    is Screen.Browse -> Screen.Browse.createRoute(sourceId = 2L)
                                     else -> item.screen.route
                                 }
                                 navController.navigate(route) {

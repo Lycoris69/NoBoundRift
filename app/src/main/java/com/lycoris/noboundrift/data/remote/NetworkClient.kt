@@ -1,11 +1,10 @@
 package com.lycoris.noboundrift.data.remote
 
+import okhttp3.Cookie
 import okhttp3.CookieJar
-import okhttp3.JavaNetCookieJar
+import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
-import java.net.CookieManager
-import java.net.CookiePolicy
 import java.util.concurrent.TimeUnit
 
 /**
@@ -25,13 +24,18 @@ object NetworkClient {
         "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 
-    fun build(enableLogging: Boolean = false): OkHttpClient {
-        val cookieManager = CookieManager().apply {
-            setCookiePolicy(CookiePolicy.ACCEPT_ALL)
+    private val cookieStore = HashMap<String, MutableList<Cookie>>()
+    private val cookieJar = object : CookieJar {
+        override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
+            cookieStore.getOrPut(url.host) { mutableListOf() }.addAll(cookies)
         }
+        override fun loadForRequest(url: HttpUrl): List<Cookie> =
+            cookieStore[url.host] ?: emptyList()
+    }
 
+    fun build(enableLogging: Boolean = false): OkHttpClient {
         return OkHttpClient.Builder()
-            .cookieJar(JavaNetCookieJar(cookieManager))
+            .cookieJar(cookieJar)
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
                     .header("User-Agent", USER_AGENT)

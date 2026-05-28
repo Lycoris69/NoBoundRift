@@ -25,8 +25,9 @@ interface Source {
     /**
      * Returns a page of manga entries from the source's catalogue or search results.
      * @param page 1-based page number.
+     * @param query Optional search query. When blank, returns the catalogue browse order.
      */
-    suspend fun fetchMangaList(page: Int): List<MangaPreview>
+    suspend fun fetchMangaList(page: Int, query: String = ""): List<MangaPreview>
 
     /**
      * Fetches full metadata for a single manga.

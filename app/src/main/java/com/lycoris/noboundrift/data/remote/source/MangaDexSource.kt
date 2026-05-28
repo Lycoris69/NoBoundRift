@@ -10,6 +10,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import java.net.URLEncoder
 import javax.inject.Inject
 
 /**
@@ -48,18 +49,24 @@ class MangaDexSource @Inject constructor(
     // ---------------------------------------------------------------------------
 
     /**
-     * Returns a page of manga sorted by latest uploaded chapter.
+     * Returns a page of manga sorted by latest uploaded chapter, or search results when
+     * [query] is non-blank. The offset is always 0 for the first page regardless of query,
+     * so the caller should reset page to 1 when the query changes.
      * @param page 1-based page number.
+     * @param query Optional title search string.
      */
-    override suspend fun fetchMangaList(page: Int): List<MangaPreview> =
+    override suspend fun fetchMangaList(page: Int, query: String): List<MangaPreview> =
         withContext(Dispatchers.IO) {
             val offset = (page - 1) * 20
-            val url = "$apiBase/manga" +
-                "?limit=20" +
-                "&offset=$offset" +
-                "&includes[]=cover_art" +
-                "&order[latestUploadedChapter]=desc" +
-                "&availableTranslatedLanguage[]=en"
+            val url = buildString {
+                append("$apiBase/manga?limit=20&offset=$offset&includes[]=cover_art")
+                append("&availableTranslatedLanguage[]=en")
+                if (query.isNotBlank()) {
+                    append("&title=${URLEncoder.encode(query, "UTF-8")}")
+                } else {
+                    append("&order[latestUploadedChapter]=desc")
+                }
+            }
 
             val root = apiGet(url)
             val data = root.getJSONArray("data")

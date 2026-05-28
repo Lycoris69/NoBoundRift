@@ -17,9 +17,10 @@ interface MangaRepository {
 
     /**
      * Returns a page of manga previews from the given source.
+     * When [query] is non-blank the source's search endpoint is used instead of the catalogue.
      * Results may be cached locally but the remote source is the authority.
      */
-    suspend fun fetchMangaList(sourceId: Long, page: Int): Result<List<MangaPreview>>
+    suspend fun fetchMangaList(sourceId: Long, page: Int, query: String = ""): Result<List<MangaPreview>>
 
     // ── Detail ───────────────────────────────────────────────────────────────
 

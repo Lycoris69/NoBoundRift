@@ -7,11 +7,11 @@ import com.lycoris.noboundrift.domain.model.MangaStatus
 import com.lycoris.noboundrift.domain.model.Page
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
+import java.net.URLEncoder
 import javax.inject.Inject
 
 /**
@@ -44,61 +44,69 @@ class MangaReadSource @Inject constructor(
         }
     }
 
-    /**
-     * POSTs a form-encoded body to [url] and returns the parsed [Document].
-     * Used for the Madara AJAX chapter list endpoint. Blocking — must run on IO dispatcher.
-     */
-    private fun postDocument(url: String, formParams: Map<String, String>): Document {
-        val formBody = FormBody.Builder().apply {
-            formParams.forEach { (key, value) -> add(key, value) }
-        }.build()
-
-        val request = Request.Builder()
-            .url(url)
-            .post(formBody)
-            .header("X-Requested-With", "XMLHttpRequest")
-            .build()
-
-        okHttpClient.newCall(request).execute().use { response ->
-            val body = response.body?.string()
-                ?: throw IllegalStateException("Empty POST response body from $url")
-            return Jsoup.parse(body, url)
-        }
-    }
-
     // ---------------------------------------------------------------------------
     // fetchMangaList
     // ---------------------------------------------------------------------------
 
     // Selectors verified: 2025-05-27
-    override suspend fun fetchMangaList(page: Int): List<MangaPreview> =
+    override suspend fun fetchMangaList(page: Int, query: String): List<MangaPreview> =
         withContext(Dispatchers.IO) {
-            val doc = getDocument("$baseUrl/manga/?page=$page&order=update")
-
-            doc.select("div.page-item-detail").mapNotNull { element ->
-                val anchor = element.selectFirst(".post-title h3 a") ?: return@mapNotNull null
-                val title = anchor.text().trim()
-                val mangaUrl = anchor.attr("href").let { href ->
-                    if (href.startsWith("//")) "https:$href" else href
-                }
-                if (mangaUrl.isBlank()) return@mapNotNull null
-
-                val imgElement = element.selectFirst(".item-thumb img")
-                val rawCover = imgElement?.attr("data-src")?.takeIf { it.isNotBlank() }
-                    ?: imgElement?.attr("src") ?: ""
-                val coverUrl = if (rawCover.startsWith("//")) "https:$rawCover" else rawCover
-
-                val mangaId = mangaUrl.trimEnd('/').substringAfterLast('/')
-
-                MangaPreview(
-                    id = mangaId,
-                    title = title,
-                    coverUrl = coverUrl,
-                    sourceId = id,
-                    url = mangaUrl,
-                )
+            if (query.isNotBlank()) {
+                fetchSearchResults(query)
+            } else {
+                fetchBrowseResults(page)
             }
         }
+
+    /**
+     * Fetches the standard catalogue browse page.
+     * Selector verified: 2025-05-27
+     */
+    private fun fetchBrowseResults(page: Int): List<MangaPreview> {
+        val doc = getDocument("$baseUrl/manga/?page=$page&order=update")
+        return doc.select("div.page-item-detail").mapNotNull { element ->
+            val anchor = element.selectFirst(".post-title h3 a") ?: return@mapNotNull null
+            val title = anchor.text().trim()
+            val mangaUrl = anchor.attr("href").let { href ->
+                if (href.startsWith("//")) "https:$href" else href
+            }
+            if (mangaUrl.isBlank()) return@mapNotNull null
+
+            val imgElement = element.selectFirst(".item-thumb img")
+            val rawCover = imgElement?.attr("data-src")?.takeIf { it.isNotBlank() }
+                ?: imgElement?.attr("src") ?: ""
+            val coverUrl = if (rawCover.startsWith("//")) "https:$rawCover" else rawCover
+
+            val mangaId = mangaUrl.trimEnd('/').substringAfterLast('/')
+            MangaPreview(id = mangaId, title = title, coverUrl = coverUrl, sourceId = id, url = mangaUrl)
+        }
+    }
+
+    /**
+     * Fetches the WordPress search results page for [query].
+     * Selector verified: 2025-05-27
+     */
+    private fun fetchSearchResults(query: String): List<MangaPreview> {
+        val encoded = URLEncoder.encode(query, "UTF-8")
+        val doc = getDocument("$baseUrl/?s=$encoded&post_type=wp-manga")
+        // Search results page uses a different container selector than the browse grid
+        return doc.select("div.c-tabs-item__content").mapNotNull { element ->
+            val anchor = element.selectFirst(".post-title h3 a") ?: return@mapNotNull null
+            val title = anchor.text().trim()
+            val mangaUrl = anchor.attr("href").let { href ->
+                if (href.startsWith("//")) "https:$href" else href
+            }
+            if (mangaUrl.isBlank()) return@mapNotNull null
+
+            val imgElement = element.selectFirst(".tab-thumb img")
+            val rawCover = imgElement?.attr("data-src")?.takeIf { it.isNotBlank() }
+                ?: imgElement?.attr("src") ?: ""
+            val coverUrl = if (rawCover.startsWith("//")) "https:$rawCover" else rawCover
+
+            val mangaId = mangaUrl.trimEnd('/').substringAfterLast('/')
+            MangaPreview(id = mangaId, title = title, coverUrl = coverUrl, sourceId = id, url = mangaUrl)
+        }
+    }
 
     // ---------------------------------------------------------------------------
     // fetchMangaDetail
@@ -147,30 +155,15 @@ class MangaReadSource @Inject constructor(
     // fetchChapterList
     // ---------------------------------------------------------------------------
 
-    // Selectors verified: 2025-05-27
+    // Selectors verified: 2025-05-28
+    // Chapters are embedded directly in the manga page — no AJAX step needed.
     override suspend fun fetchChapterList(mangaUrl: String): List<Chapter> =
         withContext(Dispatchers.IO) {
             val mangaId = mangaUrl.trimEnd('/').substringAfterLast('/')
-
-            // Step 1: fetch the manga page to obtain the post ID used by the AJAX endpoint
-            val mangaDoc = getDocument(mangaUrl)
-            val postId = mangaDoc.selectFirst("#manga-chapters-holder")
-                ?.attr("data-id") ?: ""
-
-            // Step 2: POST to admin-ajax.php to retrieve the chapter list HTML fragment
-            val ajaxDoc = postDocument(
-                url = "$baseUrl/wp-admin/admin-ajax.php",
-                formParams = mapOf(
-                    "action" to "manga_get_chapters",
-                    "manga" to postId,
-                )
-            )
-
-            // Step 3: parse the returned fragment
-            // Selectors verified: 2025-05-27
+            val doc = getDocument(mangaUrl)
             val chapterNumberRegex = Regex("Chapter\\s*([\\d.]+)", RegexOption.IGNORE_CASE)
 
-            val chapters = ajaxDoc.select("li.wp-manga-chapter").mapIndexedNotNull { index, li ->
+            val chapters = doc.select("li.wp-manga-chapter").mapIndexedNotNull { index, li ->
                 val anchor = li.selectFirst("a") ?: return@mapIndexedNotNull null
                 val chapterUrl = anchor.attr("href").let { href ->
                     if (href.startsWith("//")) "https:$href" else href

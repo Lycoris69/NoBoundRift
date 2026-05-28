@@ -32,9 +32,9 @@ class MangaRepositoryImpl @Inject constructor(
 
     // ── Browse / search ──────────────────────────────────────────────────────
 
-    override suspend fun fetchMangaList(sourceId: Long, page: Int): Result<List<MangaPreview>> =
+    override suspend fun fetchMangaList(sourceId: Long, page: Int, query: String): Result<List<MangaPreview>> =
         runCatching {
-            sourceManager.getSource(sourceId).fetchMangaList(page)
+            sourceManager.getSource(sourceId).fetchMangaList(page, query)
         }
 
     // ── Detail ───────────────────────────────────────────────────────────────
