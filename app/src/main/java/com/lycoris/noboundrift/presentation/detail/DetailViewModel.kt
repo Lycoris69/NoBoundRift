@@ -23,6 +23,7 @@ sealed interface DetailUiState {
     data class Success(
         val manga: Manga,
         val isInLibrary: Boolean = false,
+        val isLoadingChapters: Boolean = false,
     ) : DetailUiState
     data class Error(val message: String) : DetailUiState
 }
@@ -37,7 +38,7 @@ class DetailViewModel @Inject constructor(
 
     private val sourceId: Long = checkNotNull(savedStateHandle[Screen.Detail.ARG_SOURCE_ID])
     private val mangaUrl: String =
-        checkNotNull(savedStateHandle[Screen.Detail.ARG_URL]).decodeFromNav()
+        checkNotNull(savedStateHandle.get<String>(Screen.Detail.ARG_URL)).decodeFromNav()
 
     private val _uiState = MutableStateFlow<DetailUiState>(DetailUiState.Loading)
     val uiState: StateFlow<DetailUiState> = _uiState.asStateFlow()
@@ -63,10 +64,21 @@ class DetailViewModel @Inject constructor(
             _uiState.value = DetailUiState.Loading
             getMangaDetail(sourceId = sourceId, url = mangaUrl)
                 .onSuccess { manga ->
-                    // Check library status — we do a single read here; a real impl
-                    // would collect a Flow<Boolean> and keep the state live.
-                    _uiState.value = DetailUiState.Success(manga = manga)
-                    // Observe library state reactively after initial load
+                    // Show metadata immediately while chapters are still loading
+                    _uiState.value = DetailUiState.Success(
+                        manga = manga,
+                        isInLibrary = false,
+                        isLoadingChapters = true,
+                    )
+                    val chapters = repository.fetchChapterList(sourceId, mangaUrl)
+                        .getOrElse { emptyList() }
+                    val mangaWithChapters = manga.copy(chapters = chapters)
+                    _uiState.value = DetailUiState.Success(
+                        manga = mangaWithChapters,
+                        isInLibrary = false,
+                        isLoadingChapters = false,
+                    )
+                    // Observe library state reactively — keeps the flag live across DB changes
                     repository.isInLibrary(manga.id).collect { inLib ->
                         _uiState.update { state ->
                             (state as? DetailUiState.Success)?.copy(isInLibrary = inLib) ?: state
