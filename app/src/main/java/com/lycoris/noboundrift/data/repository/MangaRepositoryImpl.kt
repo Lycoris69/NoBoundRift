@@ -10,6 +10,7 @@ import com.lycoris.noboundrift.domain.model.Manga
 import com.lycoris.noboundrift.domain.model.MangaPreview
 import com.lycoris.noboundrift.domain.model.Page
 import com.lycoris.noboundrift.domain.repository.MangaRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -30,22 +31,27 @@ class MangaRepositoryImpl @Inject constructor(
     private val chapterDao: ChapterDao,
 ) : MangaRepository {
 
+    private inline fun <T> resultCatching(block: () -> T): Result<T> =
+        runCatching(block).also { result ->
+            result.exceptionOrNull()?.let { if (it is CancellationException) throw it }
+        }
+
     // ── Browse / search ──────────────────────────────────────────────────────
 
     override suspend fun fetchMangaList(sourceId: Long, page: Int, query: String): Result<List<MangaPreview>> =
-        runCatching {
+        resultCatching {
             sourceManager.getSource(sourceId).fetchMangaList(page, query)
         }
 
     // ── Detail ───────────────────────────────────────────────────────────────
 
     override suspend fun fetchMangaDetail(sourceId: Long, url: String): Result<Manga> =
-        runCatching {
+        resultCatching {
             sourceManager.getSource(sourceId).fetchMangaDetail(url)
         }
 
     override suspend fun fetchChapterList(sourceId: Long, mangaUrl: String): Result<List<Chapter>> =
-        runCatching {
+        resultCatching {
             val chapters = sourceManager.getSource(sourceId).fetchChapterList(mangaUrl)
             // Merge with locally stored read flags so the UI reflects progress
             chapters.map { chapter ->
@@ -55,7 +61,7 @@ class MangaRepositoryImpl @Inject constructor(
         }
 
     override suspend fun fetchPageList(sourceId: Long, chapterUrl: String): Result<List<Page>> =
-        runCatching {
+        resultCatching {
             sourceManager.getSource(sourceId).fetchPageList(chapterUrl)
         }
 
