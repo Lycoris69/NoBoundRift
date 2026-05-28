@@ -33,3 +33,6 @@ Thumbs.db
 *.jks
 *.keystore
 keystore.properties
+
+# Claude Code
+CLAUDE.md
