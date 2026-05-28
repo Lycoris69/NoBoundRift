@@ -21,6 +21,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.BookmarkRemove
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -101,6 +103,8 @@ fun DetailScreen(
                     MangaDetail(
                         manga = state.manga,
                         isLoadingChapters = state.isLoadingChapters,
+                        chaptersReversed = state.chaptersReversed,
+                        onToggleOrder = viewModel::toggleChapterOrder,
                         onChapterClick = { chapter ->
                             onChapterClick(state.manga.sourceId, state.manga.url, chapter.url)
                         },
@@ -116,6 +120,8 @@ fun DetailScreen(
 private fun MangaDetail(
     manga: Manga,
     isLoadingChapters: Boolean,
+    chaptersReversed: Boolean,
+    onToggleOrder: () -> Unit,
     onChapterClick: (Chapter) -> Unit,
 ) {
     LazyColumn(
@@ -185,16 +191,25 @@ private fun MangaDetail(
                 Text(
                     text = "${manga.chapters.size} Chapters",
                     style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
                 )
                 if (isLoadingChapters) {
-                    Spacer(modifier = Modifier.width(8.dp))
                     CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                IconButton(onClick = onToggleOrder, enabled = !isLoadingChapters) {
+                    Icon(
+                        imageVector = if (chaptersReversed) Icons.Default.KeyboardArrowUp
+                        else Icons.Default.KeyboardArrowDown,
+                        contentDescription = if (chaptersReversed) "Oldest first" else "Newest first",
+                    )
                 }
             }
         }
 
         // Chapter rows
-        items(manga.chapters, key = { it.id }) { chapter ->
+        val displayedChapters = if (chaptersReversed) manga.chapters.reversed() else manga.chapters
+        items(displayedChapters, key = { it.id }) { chapter ->
             ChapterRow(chapter = chapter, onClick = { onChapterClick(chapter) })
         }
     }

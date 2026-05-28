@@ -7,6 +7,7 @@ import com.lycoris.noboundrift.domain.model.MangaPreview
 import com.lycoris.noboundrift.domain.usecase.GetMangaListUseCase
 import com.lycoris.noboundrift.presentation.navigation.Screen
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,7 +44,7 @@ class BrowseViewModel @Inject constructor(
 
     fun loadNextPage() {
         val state = _uiState.value
-        if (state.isLoadingMore || !state.canLoadMore) return
+        if (state.isLoading || state.isLoadingMore || !state.canLoadMore) return
         loadPage(state.currentPage + 1)
     }
 
@@ -107,7 +108,7 @@ class BrowseViewModel @Inject constructor(
                     _uiState.update { state ->
                         val combined = if (page == 1) newItems else state.manga + newItems
                         state.copy(
-                            manga = combined,
+                            manga = combined.distinctBy { it.id },
                             isLoading = false,
                             isLoadingMore = false,
                             currentPage = page,
@@ -116,8 +117,7 @@ class BrowseViewModel @Inject constructor(
                     }
                 }
                 .onFailure { throwable ->
-                    // CancellationException is rethrown by runCatching, so it will never
-                    // arrive here — .onFailure only receives real errors.
+                    if (throwable is CancellationException) return@launch
                     _uiState.update {
                         it.copy(
                             isLoading = false,

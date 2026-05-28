@@ -24,6 +24,7 @@ sealed interface DetailUiState {
         val manga: Manga,
         val isInLibrary: Boolean = false,
         val isLoadingChapters: Boolean = false,
+        val chaptersReversed: Boolean = false,
     ) : DetailUiState
     data class Error(val message: String) : DetailUiState
 }
@@ -48,6 +49,12 @@ class DetailViewModel @Inject constructor(
     }
 
     fun retry() = loadDetail()
+
+    fun toggleChapterOrder() {
+        _uiState.update { state ->
+            (state as? DetailUiState.Success)?.copy(chaptersReversed = !state.chaptersReversed) ?: state
+        }
+    }
 
     fun toggleLibrary() {
         val state = _uiState.value as? DetailUiState.Success ?: return
