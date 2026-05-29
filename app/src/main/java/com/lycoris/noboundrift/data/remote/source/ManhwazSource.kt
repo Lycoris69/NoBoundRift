@@ -166,6 +166,9 @@ class ManhwazSource @Inject constructor(
                     ?.groupValues?.get(1)?.toFloatOrNull()
                     ?: index.toFloat()
 
+                val dateText = li.selectFirst(".chapter-release-date i")?.attr("title") ?: ""
+                val dateUpload = parseDateMillis(dateText)
+
                 val chapterId = chapterUrl.trimEnd('/').substringAfterLast('/')
 
                 Chapter(
@@ -174,6 +177,7 @@ class ManhwazSource @Inject constructor(
                     title = chapterTitle,
                     number = number,
                     url = chapterUrl,
+                    dateUpload = dateUpload,
                 )
             }
 
@@ -210,6 +214,15 @@ class ManhwazSource @Inject constructor(
     // ---------------------------------------------------------------------------
     // Private helpers
     // ---------------------------------------------------------------------------
+
+    private fun parseDateMillis(text: String): Long {
+        if (text.isBlank()) return 0L
+        return runCatching {
+            java.text.SimpleDateFormat("MMMM d, yyyy", java.util.Locale.ENGLISH)
+                .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+                .parse(text)?.time ?: 0L
+        }.getOrDefault(0L)
+    }
 
     private fun parseStatus(text: String): MangaStatus = when {
         text.contains("ongoing", ignoreCase = true) -> MangaStatus.ONGOING

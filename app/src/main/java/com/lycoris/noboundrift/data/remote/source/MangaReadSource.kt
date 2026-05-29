@@ -241,6 +241,7 @@ class MangaReadSource @Inject constructor(
         if (text.isBlank()) return 0L
         return runCatching {
             java.text.SimpleDateFormat("MMMM d, yyyy", java.util.Locale.ENGLISH)
+                .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
                 .parse(text)?.time ?: 0L
         }.getOrDefault(0L)
     }

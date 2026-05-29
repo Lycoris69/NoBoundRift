@@ -30,6 +30,10 @@ data class ReaderUiState(
     /** Whether the top/bottom chrome (app bar, page counter) is visible. */
     val showChrome: Boolean = true,
     val isLoadingNextChapter: Boolean = false,
+    val canGoToPrevChapter: Boolean = false,
+    val canGoToNextChapter: Boolean = false,
+    /** Incremented on every chapter jump so Compose can reset pager/scroll state. */
+    val chapterKey: Int = 0,
 )
 
 @HiltViewModel
@@ -53,6 +57,8 @@ class ReaderViewModel @Inject constructor(
     private var sortedChapters: List<Chapter> = emptyList()
     // URL of the next chapter to append; advances after each successful load; null = last chapter
     private var nextChapterUrl: String? = null
+
+    private var currentChapterUrl: String = chapterUrl
 
     init {
         loadPages()
@@ -83,10 +89,10 @@ class ReaderViewModel @Inject constructor(
     fun onExitReader() {
         val state = _uiState.value
         if (state.pages.isEmpty()) return
-        val progress = state.currentPageIndex.toFloat() / state.pages.size
+        val progress = (state.currentPageIndex + 1).toFloat() / state.pages.size
         if (progress >= 0.8f) {
             viewModelScope.launch {
-                markChapterRead(chapterUrl)
+                markChapterRead(currentChapterUrl)
             }
         }
     }
@@ -97,6 +103,7 @@ class ReaderViewModel @Inject constructor(
      * loading, already loaded, or there is no next chapter.
      */
     fun onNearEnd() {
+        if (_uiState.value.isLoading) return   // guard: don't auto-append while initial pages are still loading
         if (_uiState.value.isLoadingNextChapter) return
         val url = nextChapterUrl ?: return
 
@@ -119,9 +126,37 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
+    fun goToPrevChapter() {
+        val prev = findPrevBefore(currentChapterUrl) ?: return
+        jumpToChapter(prev)
+    }
+
+    fun goToNextChapter() {
+        val next = findNextAfter(currentChapterUrl) ?: return
+        jumpToChapter(next)
+    }
+
+    private fun jumpToChapter(url: String) {
+        currentChapterUrl = url
+        nextChapterUrl = findNextAfter(url) // keep private var in sync for auto-append
+        _uiState.update {
+            it.copy(
+                pages = emptyList(),
+                isLoading = true,
+                error = null,
+                currentPageIndex = 0,
+                isLoadingNextChapter = false,
+                canGoToPrevChapter = findPrevBefore(url) != null,
+                canGoToNextChapter = findNextAfter(url) != null,
+                chapterKey = it.chapterKey + 1,
+            )
+        }
+        loadPages()
+    }
+
     private fun loadPages() {
         viewModelScope.launch {
-            getChapterPages(sourceId = sourceId, chapterUrl = chapterUrl)
+            getChapterPages(sourceId = sourceId, chapterUrl = currentChapterUrl)
                 .onSuccess { pages ->
                     _uiState.update { it.copy(pages = pages, isLoading = false) }
                 }
@@ -142,7 +177,16 @@ class ReaderViewModel @Inject constructor(
             getChapterList(sourceId = sourceId, mangaUrl = mangaUrl)
                 .onSuccess { chapters ->
                     sortedChapters = chapters.sortedBy { it.number }
-                    nextChapterUrl = findNextAfter(chapterUrl)
+                    nextChapterUrl = findNextAfter(currentChapterUrl)
+                    _uiState.update {
+                        it.copy(
+                            canGoToPrevChapter = findPrevBefore(currentChapterUrl) != null,
+                            canGoToNextChapter = findNextAfter(currentChapterUrl) != null,
+                        )
+                    }
+                }
+                .onFailure { throwable ->
+                    if (throwable is CancellationException) throw throwable
                 }
             // Failure is silent — nextChapterUrl stays null, onNearEnd() becomes a no-op
         }
@@ -152,6 +196,12 @@ class ReaderViewModel @Inject constructor(
         val normalized = url.trimEnd('/')
         val idx = sortedChapters.indexOfFirst { it.url.trimEnd('/') == normalized }
         return if (idx != -1 && idx + 1 < sortedChapters.size) sortedChapters[idx + 1].url else null
+    }
+
+    private fun findPrevBefore(url: String): String? {
+        val normalized = url.trimEnd('/')
+        val idx = sortedChapters.indexOfFirst { it.url.trimEnd('/') == normalized }
+        return if (idx > 0) sortedChapters[idx - 1].url else null
     }
 
     private fun ReaderMode.toggle() = when (this) {
