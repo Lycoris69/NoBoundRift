@@ -12,11 +12,13 @@ import com.lycoris.noboundrift.presentation.navigation.Screen
 import com.lycoris.noboundrift.presentation.navigation.decodeFromNav
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 enum class ReaderMode { WEBTOON, PAGE_FLIP }
@@ -99,9 +101,7 @@ class ReaderViewModel @Inject constructor(
         if (progress >= 0.8f) {
             val chapter = sortedChapters.find { it.url.trimEnd('/') == currentChapterUrl.trimEnd('/') }
                 ?: return
-            viewModelScope.launch {
-                markChapterRead(chapter)
-            }
+            viewModelScope.launch { withContext(NonCancellable) { markChapterRead(chapter) } }
         }
     }
 

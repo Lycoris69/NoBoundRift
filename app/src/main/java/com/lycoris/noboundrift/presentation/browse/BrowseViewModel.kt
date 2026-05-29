@@ -32,22 +32,24 @@ class BrowseViewModel @Inject constructor(
     private val getMangaList: GetMangaListUseCase,
 ) : ViewModel() {
 
-    private var sourceId: Long = sourcePreferences.getSelectedSourceId()
+    private var sourceId: Long = 0L
 
     private val _uiState = MutableStateFlow(BrowseUiState())
     val uiState: StateFlow<BrowseUiState> = _uiState.asStateFlow()
 
     init {
-        loadPage(page = 1)
         viewModelScope.launch {
+            var initialized = false
             sourcePreferences.observeSelectedSourceId().collect { newSourceId ->
-                if (newSourceId != sourceId) {
+                if (!initialized) {
+                    initialized = true
+                    sourceId = newSourceId
+                    loadPage(page = 1)
+                } else if (newSourceId != sourceId) {
                     sourceId = newSourceId
                     searchJob?.cancel()
                     loadJob?.cancel()
-                    _uiState.update {
-                        BrowseUiState(searchQuery = it.searchQuery)
-                    }
+                    _uiState.update { BrowseUiState(searchQuery = it.searchQuery) }
                     loadPage(page = 1)
                 }
             }
@@ -124,7 +126,7 @@ class BrowseViewModel @Inject constructor(
                             isLoading = false,
                             isLoadingMore = false,
                             currentPage = page,
-                            canLoadMore = newItems.isNotEmpty(),
+                            canLoadMore = newItems.isNotEmpty() && querySnapshot.isBlank(),
                         )
                     }
                 }

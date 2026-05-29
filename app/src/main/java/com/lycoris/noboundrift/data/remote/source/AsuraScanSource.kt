@@ -33,6 +33,7 @@ class AsuraScanSource @Inject constructor(
     private fun getDocument(url: String): Document {
         val request = Request.Builder().url(url).build()
         okHttpClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw IllegalStateException("HTTP ${response.code} from $url")
             val body = response.body?.string()
                 ?: throw IllegalStateException("Empty response body from $url")
             return Jsoup.parse(body, url)
@@ -42,6 +43,7 @@ class AsuraScanSource @Inject constructor(
     private fun getRawHtml(url: String): String {
         val request = Request.Builder().url(url).build()
         okHttpClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw IllegalStateException("HTTP ${response.code} from $url")
             return response.body?.string()
                 ?: throw IllegalStateException("Empty response body from $url")
         }
@@ -109,8 +111,8 @@ class AsuraScanSource @Inject constructor(
             var synopsis = ""
             var genres = emptyList<String>()
 
-            if (jsonLd != null) {
-                val json = JSONObject(jsonLd)
+            val json = jsonLd?.let { runCatching { JSONObject(it) }.getOrNull() }
+            if (json != null) {
                 title = json.optString("name", "").trim()
                 synopsis = json.optString("description", "").trim()
                 coverUrl = json.optString("image", "").trim()
@@ -179,24 +181,42 @@ class AsuraScanSource @Inject constructor(
                     )
                 }
 
-            chapters.sortedBy { it.number }
+            // The page lists the same chapter link multiple times (sidebar + main list);
+            // deduplicate by URL before sorting to avoid duplicate keys in the UI.
+            chapters.distinctBy { it.url }.sortedBy { it.number }
         }
 
     // ---------------------------------------------------------------------------
     // fetchPageList
     // ---------------------------------------------------------------------------
 
-    // Selectors verified: 2026-05-29
+    // Pages are server-rendered inside an <astro-island> props blob, not as <img> tags.
+    // The props use Astro's tuple encoding: [0, value] = scalar, [1, array] = list.
+    // Verified: 2026-05-29
     override suspend fun fetchPageList(chapterUrl: String): List<Page> =
         withContext(Dispatchers.IO) {
             val doc = getDocument(chapterUrl)
+            val island = doc.selectFirst("astro-island[component-url*=ChapterReader]")
+                ?: return@withContext emptyList()
 
-            doc.select("img[src*=asura-images/chapters]")
-                .mapIndexedNotNull { index, img ->
-                    val imageUrl = img.attr("src").trim()
-                    if (imageUrl.isBlank()) return@mapIndexedNotNull null
-                    Page(index = index, imageUrl = imageUrl)
-                }
+            val propsRaw = island.attr("props").replace("&quot;", "\"")
+            val props = runCatching { JSONObject(propsRaw) }.getOrNull()
+                ?: return@withContext emptyList()
+
+            // "pages": [1, [ [0, {"url": [0, "https://cdn.asurascans.com/..."]}], ... ]]
+            val pagesOuter = props.optJSONArray("pages")
+                ?: return@withContext emptyList()
+            val pagesArray = pagesOuter.optJSONArray(1)
+                ?: return@withContext emptyList()
+
+            (0 until pagesArray.length()).mapIndexedNotNull { index, _ ->
+                runCatching {
+                    val item = pagesArray.getJSONArray(index)   // [0, {url: [0, "..."]}]
+                    val obj = item.getJSONObject(1)             // {url: [0, "..."]}
+                    val imageUrl = obj.getJSONArray("url").getString(1)
+                    if (imageUrl.isBlank()) null else Page(index = index, imageUrl = imageUrl)
+                }.getOrNull()
+            }
         }
 
     // ---------------------------------------------------------------------------
