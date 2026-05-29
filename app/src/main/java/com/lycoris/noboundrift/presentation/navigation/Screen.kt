@@ -4,10 +4,7 @@ sealed class Screen(val route: String) {
 
     data object Library : Screen("library")
 
-    data object Browse : Screen("browse/{sourceId}") {
-        const val ARG_SOURCE_ID = "sourceId"
-        fun createRoute(sourceId: Long) = "browse/$sourceId"
-    }
+    data object Browse : Screen("browse")
 
     data object Detail : Screen("detail/{sourceId}/{url}") {
         const val ARG_SOURCE_ID = "sourceId"

@@ -13,8 +13,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -28,7 +26,6 @@ import com.lycoris.noboundrift.presentation.detail.DetailScreen
 import com.lycoris.noboundrift.presentation.library.LibraryScreen
 import com.lycoris.noboundrift.presentation.reader.ReaderScreen
 import com.lycoris.noboundrift.presentation.settings.SettingsScreen
-import com.lycoris.noboundrift.presentation.settings.SettingsViewModel
 
 private data class BottomNavItem(
     val screen: Screen,
@@ -41,9 +38,6 @@ fun NoBoundRiftNavHost() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
-
-    val settingsViewModel: SettingsViewModel = hiltViewModel()
-    val settingsUiState by settingsViewModel.uiState.collectAsStateWithLifecycle()
 
     val bottomNavItems = listOf(
         BottomNavItem(
@@ -65,7 +59,7 @@ fun NoBoundRiftNavHost() {
 
     val showBottomBar = currentDestination?.hierarchy?.any { dest ->
         dest.route == Screen.Library.route ||
-            dest.route?.startsWith("browse/") == true ||
+            dest.route == Screen.Browse.route ||
             dest.route == Screen.Settings.route
     } == true
 
@@ -76,15 +70,10 @@ fun NoBoundRiftNavHost() {
                     bottomNavItems.forEach { item ->
                         NavigationBarItem(
                             selected = currentDestination?.hierarchy?.any {
-                                it.route == item.screen.route ||
-                                    (item.screen is Screen.Browse && it.route?.startsWith("browse/") == true)
+                                it.route == item.screen.route
                             } == true,
                             onClick = {
-                                val route = when (item.screen) {
-                                    is Screen.Browse -> Screen.Browse.createRoute(settingsUiState.selectedSourceId)
-                                    else -> item.screen.route
-                                }
-                                navController.navigate(route) {
+                                navController.navigate(item.screen.route) {
                                     popUpTo(navController.graph.findStartDestination().id) {
                                         saveState = true
                                     }
@@ -115,12 +104,7 @@ fun NoBoundRiftNavHost() {
                 )
             }
 
-            composable(
-                route = Screen.Browse.route,
-                arguments = listOf(
-                    navArgument(Screen.Browse.ARG_SOURCE_ID) { type = NavType.LongType }
-                ),
-            ) {
+            composable(Screen.Browse.route) {
                 BrowseScreen(
                     onMangaClick = { preview ->
                         navController.navigate(
@@ -160,7 +144,7 @@ fun NoBoundRiftNavHost() {
             }
 
             composable(Screen.Settings.route) {
-                SettingsScreen(viewModel = settingsViewModel)
+                SettingsScreen()
             }
         }
     }

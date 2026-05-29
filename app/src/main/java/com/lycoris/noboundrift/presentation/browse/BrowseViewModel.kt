@@ -1,11 +1,10 @@
 package com.lycoris.noboundrift.presentation.browse
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lycoris.noboundrift.data.local.SourcePreferences
 import com.lycoris.noboundrift.domain.model.MangaPreview
 import com.lycoris.noboundrift.domain.usecase.GetMangaListUseCase
-import com.lycoris.noboundrift.presentation.navigation.Screen
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -29,17 +28,30 @@ data class BrowseUiState(
 
 @HiltViewModel
 class BrowseViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
+    private val sourcePreferences: SourcePreferences,
     private val getMangaList: GetMangaListUseCase,
 ) : ViewModel() {
 
-    private val sourceId: Long = checkNotNull(savedStateHandle[Screen.Browse.ARG_SOURCE_ID])
+    private var sourceId: Long = sourcePreferences.getSelectedSourceId()
 
     private val _uiState = MutableStateFlow(BrowseUiState())
     val uiState: StateFlow<BrowseUiState> = _uiState.asStateFlow()
 
     init {
         loadPage(page = 1)
+        viewModelScope.launch {
+            sourcePreferences.observeSelectedSourceId().collect { newSourceId ->
+                if (newSourceId != sourceId) {
+                    sourceId = newSourceId
+                    searchJob?.cancel()
+                    loadJob?.cancel()
+                    _uiState.update {
+                        BrowseUiState(searchQuery = it.searchQuery)
+                    }
+                    loadPage(page = 1)
+                }
+            }
+        }
     }
 
     fun loadNextPage() {
