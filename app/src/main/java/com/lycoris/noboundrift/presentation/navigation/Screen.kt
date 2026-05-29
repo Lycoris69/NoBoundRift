@@ -24,6 +24,8 @@ sealed class Screen(val route: String) {
         fun createRoute(sourceId: Long, mangaId: String, chapterUrl: String, mangaTitle: String): String =
             "reader/$sourceId/${mangaId.encodeForNav()}/${chapterUrl.encodeForNav()}/${mangaTitle.encodeForNav()}"
     }
+
+    data object Settings : Screen("settings")
 }
 
 fun String.encodeForNav(): String = java.net.URLEncoder.encode(this, "UTF-8")

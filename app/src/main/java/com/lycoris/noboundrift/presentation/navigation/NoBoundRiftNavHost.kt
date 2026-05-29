@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -12,6 +13,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -24,6 +27,8 @@ import com.lycoris.noboundrift.presentation.browse.BrowseScreen
 import com.lycoris.noboundrift.presentation.detail.DetailScreen
 import com.lycoris.noboundrift.presentation.library.LibraryScreen
 import com.lycoris.noboundrift.presentation.reader.ReaderScreen
+import com.lycoris.noboundrift.presentation.settings.SettingsScreen
+import com.lycoris.noboundrift.presentation.settings.SettingsViewModel
 
 private data class BottomNavItem(
     val screen: Screen,
@@ -37,7 +42,9 @@ fun NoBoundRiftNavHost() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
-    // Screens that show the bottom navigation bar
+    val settingsViewModel: SettingsViewModel = hiltViewModel()
+    val settingsUiState by settingsViewModel.uiState.collectAsStateWithLifecycle()
+
     val bottomNavItems = listOf(
         BottomNavItem(
             screen = Screen.Library,
@@ -45,16 +52,21 @@ fun NoBoundRiftNavHost() {
             icon = { Icon(Icons.Default.BookmarkBorder, contentDescription = "Library") },
         ),
         BottomNavItem(
-            // route pattern used for hierarchy matching; actual navigation uses createRoute(1L)
             screen = Screen.Browse,
             label = "Browse",
             icon = { Icon(Icons.Default.Explore, contentDescription = "Browse") },
+        ),
+        BottomNavItem(
+            screen = Screen.Settings,
+            label = "Settings",
+            icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
         ),
     )
 
     val showBottomBar = currentDestination?.hierarchy?.any { dest ->
         dest.route == Screen.Library.route ||
-            dest.route?.startsWith("browse/") == true
+            dest.route?.startsWith("browse/") == true ||
+            dest.route == Screen.Settings.route
     } == true
 
     Scaffold(
@@ -69,7 +81,7 @@ fun NoBoundRiftNavHost() {
                             } == true,
                             onClick = {
                                 val route = when (item.screen) {
-                                    is Screen.Browse -> Screen.Browse.createRoute(sourceId = 2L)
+                                    is Screen.Browse -> Screen.Browse.createRoute(settingsUiState.selectedSourceId)
                                     else -> item.screen.route
                                 }
                                 navController.navigate(route) {
@@ -145,6 +157,10 @@ fun NoBoundRiftNavHost() {
                 ),
             ) {
                 ReaderScreen(onBackClick = { navController.popBackStack() })
+            }
+
+            composable(Screen.Settings.route) {
+                SettingsScreen(viewModel = settingsViewModel)
             }
         }
     }
