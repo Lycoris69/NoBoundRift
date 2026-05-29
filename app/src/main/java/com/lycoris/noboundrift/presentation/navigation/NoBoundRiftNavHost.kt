@@ -126,9 +126,9 @@ fun NoBoundRiftNavHost() {
                 ),
             ) {
                 DetailScreen(
-                    onChapterClick = { sourceId, mangaId, chapterUrl ->
+                    onChapterClick = { sourceId, mangaId, chapterUrl, mangaTitle ->
                         navController.navigate(
-                            Screen.Reader.createRoute(sourceId, mangaId, chapterUrl)
+                            Screen.Reader.createRoute(sourceId, mangaId, chapterUrl, mangaTitle)
                         )
                     },
                     onBackClick = { navController.popBackStack() },
@@ -141,11 +141,10 @@ fun NoBoundRiftNavHost() {
                     navArgument(Screen.Reader.ARG_SOURCE_ID) { type = NavType.LongType },
                     navArgument(Screen.Reader.ARG_MANGA_ID) { type = NavType.StringType },
                     navArgument(Screen.Reader.ARG_CHAPTER_URL) { type = NavType.StringType },
+                    navArgument(Screen.Reader.ARG_MANGA_TITLE) { type = NavType.StringType },
                 ),
             ) {
-                ReaderScreen(
-                    onBackClick = { navController.popBackStack() },
-                )
+                ReaderScreen(onBackClick = { navController.popBackStack() })
             }
         }
     }

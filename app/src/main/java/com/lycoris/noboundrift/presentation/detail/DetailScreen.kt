@@ -1,12 +1,13 @@
 package com.lycoris.noboundrift.presentation.detail
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,10 +24,10 @@ import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.BookmarkRemove
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.foundation.clickable
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,7 +52,7 @@ import com.lycoris.noboundrift.presentation.theme.ReadIndicator
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailScreen(
-    onChapterClick: (sourceId: Long, mangaId: String, chapterUrl: String) -> Unit,
+    onChapterClick: (sourceId: Long, mangaId: String, chapterUrl: String, mangaTitle: String) -> Unit,
     onBackClick: () -> Unit,
     viewModel: DetailViewModel = hiltViewModel(),
 ) {
@@ -104,9 +105,10 @@ fun DetailScreen(
                         manga = state.manga,
                         isLoadingChapters = state.isLoadingChapters,
                         chaptersReversed = state.chaptersReversed,
+                        lastReadChapterUrl = state.lastReadChapterUrl,
                         onToggleOrder = viewModel::toggleChapterOrder,
                         onChapterClick = { chapter ->
-                            onChapterClick(state.manga.sourceId, state.manga.url, chapter.url)
+                            onChapterClick(state.manga.sourceId, state.manga.url, chapter.url, state.manga.title)
                         },
                     )
                 }
@@ -121,9 +123,12 @@ private fun MangaDetail(
     manga: Manga,
     isLoadingChapters: Boolean,
     chaptersReversed: Boolean,
+    lastReadChapterUrl: String?,
     onToggleOrder: () -> Unit,
     onChapterClick: (Chapter) -> Unit,
 ) {
+    val continueChapter = lastReadChapterUrl?.let { url -> manga.chapters.find { it.url == url } }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -147,8 +152,7 @@ private fun MangaDetail(
                         style = MaterialTheme.typography.headlineMedium,
                     )
                     Text(
-                        text = manga.status.name.lowercase()
-                            .replaceFirstChar { it.uppercase() },
+                        text = manga.status.name.lowercase().replaceFirstChar { it.uppercase() },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -203,6 +207,19 @@ private fun MangaDetail(
                         else Icons.Default.KeyboardArrowDown,
                         contentDescription = if (chaptersReversed) "Oldest first" else "Newest first",
                     )
+                }
+            }
+        }
+
+        // Continue Reading button — only present after at least one chapter has been read
+        if (continueChapter != null) {
+            item {
+                val label = continueChapter.title.ifBlank { "Chapter ${continueChapter.number}" }
+                Button(
+                    onClick = { onChapterClick(continueChapter) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(text = "Continue: $label")
                 }
             }
         }

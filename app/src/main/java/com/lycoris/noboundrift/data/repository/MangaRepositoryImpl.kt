@@ -16,14 +16,6 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Concrete repository that coordinates between:
- * - [SourceManager] (network/scraper layer)
- * - [MangaDao] / [ChapterDao] (Room persistence layer)
- *
- * All network calls are delegated to the appropriate [Source] fetched via [SourceManager].
- * Results are wrapped in [Result] so the ViewModel can handle errors without try/catch.
- */
 @Singleton
 class MangaRepositoryImpl @Inject constructor(
     private val sourceManager: SourceManager,
@@ -53,7 +45,6 @@ class MangaRepositoryImpl @Inject constructor(
     override suspend fun fetchChapterList(sourceId: Long, mangaUrl: String): Result<List<Chapter>> =
         resultCatching {
             val chapters = sourceManager.getSource(sourceId).fetchChapterList(mangaUrl)
-            // Merge with locally stored read flags so the UI reflects progress
             chapters.map { chapter ->
                 val local = chapterDao.getByUrl(chapter.url)
                 if (local != null) chapter.copy(read = local.read) else chapter
@@ -81,10 +72,24 @@ class MangaRepositoryImpl @Inject constructor(
     override fun isInLibrary(mangaId: String): Flow<Boolean> =
         mangaDao.observeExists(mangaId)
 
+    override suspend fun updateLatestChapterAt(mangaId: String, latestAt: Long) {
+        mangaDao.updateLatestChapterAt(mangaId, latestAt)
+    }
+
     // ── Reading progress ──────────────────────────────────────────────────────
 
-    override suspend fun markChapterRead(chapterUrl: String) {
-        chapterDao.markRead(chapterUrl)
+    override suspend fun markChapterRead(chapter: Chapter) {
+        chapterDao.insertOrReplace(
+            ChapterEntity(
+                chapterUrl = chapter.url,
+                mangaId = chapter.mangaId,
+                title = chapter.title,
+                number = chapter.number,
+                read = true,
+                dateUpload = chapter.dateUpload,
+                lastReadAt = System.currentTimeMillis(),
+            )
+        )
     }
 
     override suspend fun markChapterUnread(chapterUrl: String) {
@@ -102,6 +107,7 @@ class MangaRepositoryImpl @Inject constructor(
         coverUrl = coverUrl,
         sourceId = sourceId,
         url = url,
+        latestChapterAt = latestChapterAt,
     )
 
     private fun MangaPreview.toEntity() = MangaEntity(

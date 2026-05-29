@@ -6,28 +6,14 @@ import com.lycoris.noboundrift.domain.model.MangaPreview
 import com.lycoris.noboundrift.domain.model.Page
 import kotlinx.coroutines.flow.Flow
 
-/**
- * Repository interface in the domain layer — the ViewModel and use-case layer depend
- * on this abstraction, not on the concrete data-layer implementation. This keeps the
- * domain pure and makes the data layer swappable / testable.
- */
 interface MangaRepository {
 
     // ── Browse / search ──────────────────────────────────────────────────────
 
-    /**
-     * Returns a page of manga previews from the given source.
-     * When [query] is non-blank the source's search endpoint is used instead of the catalogue.
-     * Results may be cached locally but the remote source is the authority.
-     */
     suspend fun fetchMangaList(sourceId: Long, page: Int, query: String = ""): Result<List<MangaPreview>>
 
     // ── Detail ───────────────────────────────────────────────────────────────
 
-    /**
-     * Fetches full manga metadata from the remote source and merges it with
-     * any locally stored reading state (e.g. chapter read flags).
-     */
     suspend fun fetchMangaDetail(sourceId: Long, url: String): Result<Manga>
 
     suspend fun fetchChapterList(sourceId: Long, mangaUrl: String): Result<List<Chapter>>
@@ -36,7 +22,6 @@ interface MangaRepository {
 
     // ── Library (Room-backed) ─────────────────────────────────────────────────
 
-    /** Emits the current saved library, updated whenever the DB changes. */
     fun getLibrary(): Flow<List<MangaPreview>>
 
     suspend fun addToLibrary(manga: MangaPreview)
@@ -45,9 +30,11 @@ interface MangaRepository {
 
     fun isInLibrary(mangaId: String): Flow<Boolean>
 
+    suspend fun updateLatestChapterAt(mangaId: String, latestAt: Long)
+
     // ── Reading progress ──────────────────────────────────────────────────────
 
-    suspend fun markChapterRead(chapterUrl: String)
+    suspend fun markChapterRead(chapter: Chapter)
 
     suspend fun markChapterUnread(chapterUrl: String)
 

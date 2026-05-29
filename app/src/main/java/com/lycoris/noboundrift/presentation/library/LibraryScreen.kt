@@ -20,6 +20,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lycoris.noboundrift.domain.model.MangaPreview
 import com.lycoris.noboundrift.presentation.common.MangaCard
 
+private const val NEW_CHAPTER_WINDOW_MS = 7L * 24 * 3600 * 1000
+
 @Composable
 fun LibraryScreen(
     onMangaClick: (MangaPreview) -> Unit,
@@ -38,7 +40,11 @@ fun LibraryScreen(
             modifier = Modifier.fillMaxSize(),
         ) {
             items(uiState.manga, key = { it.id }) { preview ->
-                MangaCard(preview = preview, onClick = { onMangaClick(preview) })
+                MangaCard(
+                    preview = preview,
+                    onClick = { onMangaClick(preview) },
+                    showNewBadge = preview.latestChapterAt > System.currentTimeMillis() - NEW_CHAPTER_WINDOW_MS,
+                )
             }
         }
     }

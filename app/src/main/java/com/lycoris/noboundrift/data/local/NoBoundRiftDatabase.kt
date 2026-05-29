@@ -7,14 +7,9 @@ import com.lycoris.noboundrift.data.local.dao.MangaDao
 import com.lycoris.noboundrift.data.local.entity.ChapterEntity
 import com.lycoris.noboundrift.data.local.entity.MangaEntity
 
-/**
- * Room database. Version bumps require a migration strategy — use
- * [androidx.room.migration.Migration] objects or [RoomDatabase.Builder.fallbackToDestructiveMigration]
- * (acceptable for personal use during early development).
- */
 @Database(
     entities = [MangaEntity::class, ChapterEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class NoBoundRiftDatabase : RoomDatabase() {

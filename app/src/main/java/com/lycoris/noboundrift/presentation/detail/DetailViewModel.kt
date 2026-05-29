@@ -27,6 +27,7 @@ sealed interface DetailUiState {
         val isInLibrary: Boolean = false,
         val isLoadingChapters: Boolean = false,
         val chaptersReversed: Boolean = false,
+        val lastReadChapterUrl: String? = null,
     ) : DetailUiState
     data class Error(val message: String) : DetailUiState
 }
@@ -79,7 +80,6 @@ class DetailViewModel @Inject constructor(
                     // Show metadata immediately while chapters are still loading
                     _uiState.value = DetailUiState.Success(
                         manga = manga,
-                        isInLibrary = false,
                         isLoadingChapters = true,
                     )
                     val chapters = repository.fetchChapterList(sourceId, mangaUrl)
@@ -87,14 +87,26 @@ class DetailViewModel @Inject constructor(
                     val mangaWithChapters = manga.copy(chapters = chapters)
                     _uiState.value = DetailUiState.Success(
                         manga = mangaWithChapters,
-                        isInLibrary = false,
                         isLoadingChapters = false,
                     )
-                    // Child of loadJob — cancelled automatically when loadJob is cancelled
+
+                    val latestAt = chapters.maxOfOrNull { it.dateUpload } ?: 0L
+                    if (latestAt > 0L) {
+                        launch { repository.updateLatestChapterAt(manga.id, latestAt) }
+                    }
+
+                    // Both observers are children of loadJob — cancelled automatically when loadJob is cancelled
                     launch {
                         repository.isInLibrary(manga.id).collect { inLib ->
                             _uiState.update { state ->
                                 (state as? DetailUiState.Success)?.copy(isInLibrary = inLib) ?: state
+                            }
+                        }
+                    }
+                    launch {
+                        repository.getLastReadChapter(manga.id).collect { url ->
+                            _uiState.update { state ->
+                                (state as? DetailUiState.Success)?.copy(lastReadChapterUrl = url) ?: state
                             }
                         }
                     }

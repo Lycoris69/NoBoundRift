@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -50,6 +51,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -158,6 +160,8 @@ fun ReaderScreen(
                     ReaderTopBar(
                         currentPage = uiState.currentPageIndex + 1,
                         totalPages = uiState.pages.size,
+                        mangaTitle = uiState.mangaTitle,
+                        currentChapterTitle = uiState.currentChapterTitle,
                         readerMode = uiState.readerMode,
                         canGoToPrevChapter = uiState.canGoToPrevChapter,
                         canGoToNextChapter = uiState.canGoToNextChapter,
@@ -302,6 +306,8 @@ private fun PageImage(page: Page, modifier: Modifier = Modifier) {
 private fun ReaderTopBar(
     currentPage: Int,
     totalPages: Int,
+    mangaTitle: String,
+    currentChapterTitle: String,
     readerMode: ReaderMode,
     canGoToPrevChapter: Boolean,
     canGoToNextChapter: Boolean,
@@ -328,13 +334,31 @@ private fun ReaderTopBar(
                 tint = Color.White.copy(alpha = if (canGoToPrevChapter) 1f else 0.4f),
             )
         }
-        Text(
-            text = "$currentPage / $totalPages",
-            color = Color.White,
-            style = MaterialTheme.typography.labelSmall,
-            textAlign = TextAlign.Center,
+        Column(
             modifier = Modifier.weight(1f),
-        )
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            if (mangaTitle.isNotEmpty()) {
+                Text(
+                    text = mangaTitle,
+                    color = Color.White.copy(alpha = 0.8f),
+                    style = MaterialTheme.typography.labelSmall,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Text(
+                text = if (currentChapterTitle.isNotEmpty()) "$currentChapterTitle  $currentPage / $totalPages"
+                       else "$currentPage / $totalPages",
+                color = Color.White,
+                style = MaterialTheme.typography.labelSmall,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         IconButton(onClick = onNextChapter, enabled = canGoToNextChapter) {
             Icon(
                 Icons.Default.SkipNext,

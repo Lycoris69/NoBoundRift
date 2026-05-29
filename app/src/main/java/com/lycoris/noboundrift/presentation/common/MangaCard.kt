@@ -22,15 +22,12 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.lycoris.noboundrift.domain.model.MangaPreview
 
-/**
- * Reusable manga thumbnail card used in both the library grid and browse grid.
- * Displays the cover image with a gradient overlay holding the title.
- */
 @Composable
 fun MangaCard(
     preview: MangaPreview,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    showNewBadge: Boolean = false,
 ) {
     Card(
         modifier = modifier
@@ -46,10 +43,8 @@ fun MangaCard(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
-                    // Standard manga cover aspect ratio (2:3)
                     .aspectRatio(2f / 3f),
             )
-            // Gradient scrim so title text is always legible over the cover
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -71,6 +66,24 @@ fun MangaCard(
                     .align(Alignment.BottomStart)
                     .padding(horizontal = 6.dp, vertical = 4.dp),
             )
+            if (showNewBadge) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.error,
+                            shape = RoundedCornerShape(4.dp),
+                        )
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                ) {
+                    Text(
+                        text = "NEW",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onError,
+                    )
+                }
+            }
         }
     }
 }
