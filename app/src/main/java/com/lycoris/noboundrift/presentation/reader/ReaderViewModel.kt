@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -68,6 +69,13 @@ class ReaderViewModel @Inject constructor(
 
     private var currentChapterUrl: String = chapterUrl
 
+    // Bug 1: track chapter segment boundaries for correct exit-progress accounting
+    private data class ChapterSegment(val url: String, val startIndex: Int)
+    private val chapterSegments = mutableListOf<ChapterSegment>()
+
+    // Bug 2: track the near-end job so it can be cancelled on chapter jump
+    private var nearEndJob: Job? = null
+
     init {
         loadPages()
         resolveNextChapter()
@@ -91,15 +99,27 @@ class ReaderViewModel @Inject constructor(
     }
 
     /**
-     * Called when the user leaves the reader. Marks the chapter as read
-     * if they reached at least 80% through the pages.
+     * Called when the user leaves the reader. Identifies which chapter segment
+     * the user is currently in (accounting for seamlessly appended chapters) and
+     * marks that chapter as read if they reached at least 80% through its pages.
      */
     fun onExitReader() {
         val state = _uiState.value
         if (state.pages.isEmpty()) return
-        val progress = (state.currentPageIndex + 1).toFloat() / state.pages.size
+
+        // Find which chapter segment the user is currently in
+        val activeSegment = chapterSegments.lastOrNull { it.startIndex <= state.currentPageIndex }
+            ?: return
+        val nextSegmentStart = chapterSegments.firstOrNull { it.startIndex > state.currentPageIndex }?.startIndex
+            ?: state.pages.size
+
+        val chapterPageCount = nextSegmentStart - activeSegment.startIndex
+        val pageWithinChapter = state.currentPageIndex - activeSegment.startIndex + 1
+        if (chapterPageCount <= 0) return
+
+        val progress = pageWithinChapter.toFloat() / chapterPageCount
         if (progress >= 0.8f) {
-            val chapter = sortedChapters.find { it.url.trimEnd('/') == currentChapterUrl.trimEnd('/') }
+            val chapter = sortedChapters.find { it.url.trimEnd('/') == activeSegment.url.trimEnd('/') }
                 ?: return
             viewModelScope.launch { withContext(NonCancellable) { markChapterRead(chapter) } }
         }
@@ -116,13 +136,15 @@ class ReaderViewModel @Inject constructor(
         val url = nextChapterUrl ?: return
 
         _uiState.update { it.copy(isLoadingNextChapter = true) }
-        viewModelScope.launch {
+        nearEndJob = viewModelScope.launch {
             getChapterPages(sourceId = sourceId, chapterUrl = url)
                 .onSuccess { newPages ->
                     if (newPages.isEmpty()) {
                         _uiState.update { it.copy(isLoadingNextChapter = false) }
                         return@onSuccess
                     }
+                    // Record the segment boundary before appending (captures current page count)
+                    chapterSegments.add(ChapterSegment(url, _uiState.value.pages.size))
                     val offset = _uiState.value.pages.size
                     val offsetPages = newPages.map { it.copy(index = offset + it.index) }
                     _uiState.update {
@@ -149,6 +171,8 @@ class ReaderViewModel @Inject constructor(
     }
 
     private fun jumpToChapter(url: String) {
+        nearEndJob?.cancel()
+        chapterSegments.clear()
         currentChapterUrl = url
         nextChapterUrl = findNextAfter(url)
         _uiState.update {
@@ -179,6 +203,9 @@ class ReaderViewModel @Inject constructor(
                             )
                         }
                     } else {
+                        // Seed the segment list for this chapter before updating state
+                        chapterSegments.clear()
+                        chapterSegments.add(ChapterSegment(currentChapterUrl, 0))
                         _uiState.update { it.copy(pages = pages, isLoading = false) }
                     }
                 }
@@ -206,6 +233,17 @@ class ReaderViewModel @Inject constructor(
                             canGoToNextChapter = findNextAfter(currentChapterUrl) != null,
                             currentChapterTitle = chapterTitleFor(currentChapterUrl),
                         )
+                    }
+                    // Bug 3: if pages are already loaded and the reader is near the end,
+                    // the onNearEnd that fired during init found nextChapterUrl == null and
+                    // returned early — trigger it now that the chapter list is resolved.
+                    val state = _uiState.value
+                    if (nextChapterUrl != null &&
+                        state.pages.isNotEmpty() &&
+                        !state.isLoadingNextChapter &&
+                        state.currentPageIndex >= state.pages.size - 3
+                    ) {
+                        onNearEnd()
                     }
                 }
                 .onFailure { throwable ->
