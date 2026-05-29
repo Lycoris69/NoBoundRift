@@ -231,6 +231,13 @@ private fun ChapterRow(chapter: Chapter, onClick: () -> Unit) {
                 color = if (chapter.read) MaterialTheme.colorScheme.onSurfaceVariant
                 else MaterialTheme.colorScheme.onSurface,
             )
+            if (chapter.dateUpload > 0L) {
+                Text(
+                    text = formatChapterDate(chapter.dateUpload),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         if (chapter.read) {
             Text(
@@ -241,3 +248,8 @@ private fun ChapterRow(chapter: Chapter, onClick: () -> Unit) {
         }
     }
 }
+
+private fun formatChapterDate(millis: Long): String =
+    java.text.SimpleDateFormat("MMM d, yyyy", java.util.Locale.ENGLISH)
+        .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+        .format(java.util.Date(millis))

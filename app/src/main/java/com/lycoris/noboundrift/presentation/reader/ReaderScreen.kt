@@ -24,6 +24,8 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.ViewDay
 import androidx.compose.material3.CircularProgressIndicator
@@ -35,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -44,6 +47,9 @@ import kotlinx.coroutines.flow.map
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -66,9 +72,31 @@ fun ReaderScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    val context = LocalContext.current
+    val view = LocalView.current
+
+    // Hide/show system bars to match chrome visibility
+    LaunchedEffect(uiState.showChrome) {
+        val window = (context as android.app.Activity).window
+        val controller = androidx.core.view.WindowCompat.getInsetsController(window, view)
+        if (uiState.showChrome) {
+            controller.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        } else {
+            controller.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            controller.systemBarsBehavior =
+                androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
+
     // Mark chapter read when leaving — DisposableEffect runs onDispose
     DisposableEffect(Unit) {
-        onDispose { viewModel.onExitReader() }
+        onDispose {
+            viewModel.onExitReader()
+            // Restore system bars so other screens are not affected
+            val window = (context as android.app.Activity).window
+            val controller = androidx.core.view.WindowCompat.getInsetsController(window, view)
+            controller.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        }
     }
 
     Box(
@@ -100,20 +128,24 @@ fun ReaderScreen(
                 )
 
                 when (uiState.readerMode) {
-                    ReaderMode.WEBTOON -> WebtoonReader(
-                        pages = uiState.pages,
-                        isLoadingNextChapter = uiState.isLoadingNextChapter,
-                        onPageVisible = viewModel::onPageChanged,
-                        onNearEnd = viewModel::onNearEnd,
-                        modifier = centerClickModifier,
-                    )
-                    ReaderMode.PAGE_FLIP -> PageFlipReader(
-                        pages = uiState.pages,
-                        currentPage = uiState.currentPageIndex,
-                        onPageChanged = viewModel::onPageChanged,
-                        onNearEnd = viewModel::onNearEnd,
-                        modifier = centerClickModifier,
-                    )
+                    ReaderMode.WEBTOON -> key(uiState.chapterKey) {
+                        WebtoonReader(
+                            pages = uiState.pages,
+                            isLoadingNextChapter = uiState.isLoadingNextChapter,
+                            onPageVisible = viewModel::onPageChanged,
+                            onNearEnd = viewModel::onNearEnd,
+                            modifier = centerClickModifier,
+                        )
+                    }
+                    ReaderMode.PAGE_FLIP -> key(uiState.chapterKey) {
+                        PageFlipReader(
+                            pages = uiState.pages,
+                            currentPage = uiState.currentPageIndex,
+                            onPageChanged = viewModel::onPageChanged,
+                            onNearEnd = viewModel::onNearEnd,
+                            modifier = centerClickModifier,
+                        )
+                    }
                 }
 
                 // Overlay chrome (top bar)
@@ -127,11 +159,12 @@ fun ReaderScreen(
                         currentPage = uiState.currentPageIndex + 1,
                         totalPages = uiState.pages.size,
                         readerMode = uiState.readerMode,
-                        onBackClick = {
-                            viewModel.onExitReader()
-                            onBackClick()
-                        },
+                        canGoToPrevChapter = uiState.canGoToPrevChapter,
+                        canGoToNextChapter = uiState.canGoToNextChapter,
+                        onBackClick = { onBackClick() },
                         onToggleMode = viewModel::toggleReaderMode,
+                        onPrevChapter = viewModel::goToPrevChapter,
+                        onNextChapter = viewModel::goToNextChapter,
                     )
                 }
             }
@@ -225,10 +258,9 @@ private fun PageFlipReader(
         state = pagerState,
         modifier = modifier.fillMaxSize(),
     ) { pageIndex ->
-        PageImage(
-            page = pages[pageIndex],
-            modifier = Modifier.fillMaxSize(),
-        )
+        pages.getOrNull(pageIndex)?.let { page ->
+            PageImage(page = page, modifier = Modifier.fillMaxSize())
+        }
     }
 }
 
@@ -271,8 +303,12 @@ private fun ReaderTopBar(
     currentPage: Int,
     totalPages: Int,
     readerMode: ReaderMode,
+    canGoToPrevChapter: Boolean,
+    canGoToNextChapter: Boolean,
     onBackClick: () -> Unit,
     onToggleMode: () -> Unit,
+    onPrevChapter: () -> Unit,
+    onNextChapter: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -285,13 +321,27 @@ private fun ReaderTopBar(
         IconButton(onClick = onBackClick) {
             Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
         }
-        Spacer(Modifier.width(8.dp))
+        IconButton(onClick = onPrevChapter, enabled = canGoToPrevChapter) {
+            Icon(
+                Icons.Default.SkipPrevious,
+                contentDescription = "Previous chapter",
+                tint = Color.White.copy(alpha = if (canGoToPrevChapter) 1f else 0.4f),
+            )
+        }
         Text(
             text = "$currentPage / $totalPages",
             color = Color.White,
             style = MaterialTheme.typography.labelSmall,
+            textAlign = TextAlign.Center,
             modifier = Modifier.weight(1f),
         )
+        IconButton(onClick = onNextChapter, enabled = canGoToNextChapter) {
+            Icon(
+                Icons.Default.SkipNext,
+                contentDescription = "Next chapter",
+                tint = Color.White.copy(alpha = if (canGoToNextChapter) 1f else 0.4f),
+            )
+        }
         IconButton(onClick = onToggleMode) {
             Icon(
                 imageVector = if (readerMode == ReaderMode.WEBTOON) Icons.Default.SwapHoriz
