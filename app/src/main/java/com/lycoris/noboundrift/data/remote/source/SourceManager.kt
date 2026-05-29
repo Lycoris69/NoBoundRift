@@ -15,10 +15,12 @@ import javax.inject.Singleton
 class SourceManager @Inject constructor(
     mangaReadSource: MangaReadSource,
     manhwazSource: ManhwazSource,
+    asuraScanSource: AsuraScanSource,
 ) {
     private val sources: Map<Long, Source> = listOf(
         mangaReadSource,
         manhwazSource,
+        asuraScanSource,
     ).associateBy { it.id }
 
     /**
