@@ -175,7 +175,7 @@ class MangaReadSource @Inject constructor(
                     ?.groupValues?.get(1)?.toFloatOrNull()
                     ?: index.toFloat()
 
-                val dateText = li.selectFirst(".chapter-release-date i")?.attr("title") ?: ""
+                val dateText = li.selectFirst(".chapter-release-date i")?.text()?.trim() ?: ""
                 val dateUpload = parseDateMillis(dateText)
 
                 val chapterId = chapterUrl.trimEnd('/').substringAfterLast('/')
@@ -233,16 +233,30 @@ class MangaReadSource @Inject constructor(
         else -> MangaStatus.UNKNOWN
     }
 
-    /**
-     * Attempts to parse a date string from a Madara chapter date tooltip into epoch millis.
-     * Returns 0L on any parse failure rather than throwing.
-     */
+    // Selectors verified: 2026-05-29
+    // Date text is the inner text of .chapter-release-date i (no title attr).
+    // Format: "dd.MM.yyyy" for older chapters, relative "X days ago" for recent.
     private fun parseDateMillis(text: String): Long {
         if (text.isBlank()) return 0L
-        return runCatching {
-            java.text.SimpleDateFormat("MMMM d, yyyy", java.util.Locale.ENGLISH)
+        // Absolute: dd.MM.yyyy (e.g. "03.09.2025")
+        runCatching {
+            java.text.SimpleDateFormat("dd.MM.yyyy", java.util.Locale.ENGLISH)
                 .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
-                .parse(text)?.time ?: 0L
-        }.getOrDefault(0L)
+                .parse(text)?.time
+        }.getOrNull()?.let { return it }
+        // Relative: "X mins/hours/days/weeks/months/years ago"
+        val match = Regex("(\\d+)\\s+(min|hour|day|week|month|year)s?\\s+ago", RegexOption.IGNORE_CASE)
+            .find(text) ?: return 0L
+        val amount = match.groupValues[1].toLong()
+        val unitMs = when (match.groupValues[2].lowercase()) {
+            "min"   -> 60_000L
+            "hour"  -> 3_600_000L
+            "day"   -> 86_400_000L
+            "week"  -> 7 * 86_400_000L
+            "month" -> 30 * 86_400_000L
+            "year"  -> 365 * 86_400_000L
+            else    -> return 0L
+        }
+        return System.currentTimeMillis() - amount * unitMs
     }
 }
