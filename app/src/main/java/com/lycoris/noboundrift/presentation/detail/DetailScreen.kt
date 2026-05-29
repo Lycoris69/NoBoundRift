@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.BookmarkRemove
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -97,7 +98,14 @@ fun DetailScreen(
                 }
                 is DetailUiState.Error -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(text = state.message, color = MaterialTheme.colorScheme.error)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.padding(32.dp),
+                        ) {
+                            Text(text = state.message, color = MaterialTheme.colorScheme.error)
+                            Button(onClick = viewModel::retry) { Text("Retry") }
+                        }
                     }
                 }
                 is DetailUiState.Success -> {
@@ -261,6 +269,15 @@ private fun ChapterRow(chapter: Chapter, onClick: () -> Unit) {
                 text = "Read",
                 style = MaterialTheme.typography.labelSmall,
                 color = ReadIndicator,
+            )
+        }
+        if (chapter.isLocked) {
+            Spacer(modifier = Modifier.width(4.dp))
+            Icon(
+                imageVector = Icons.Default.Lock,
+                contentDescription = "Premium chapter",
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

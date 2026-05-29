@@ -119,6 +119,10 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             getChapterPages(sourceId = sourceId, chapterUrl = url)
                 .onSuccess { newPages ->
+                    if (newPages.isEmpty()) {
+                        _uiState.update { it.copy(isLoadingNextChapter = false) }
+                        return@onSuccess
+                    }
                     val offset = _uiState.value.pages.size
                     val offsetPages = newPages.map { it.copy(index = offset + it.index) }
                     _uiState.update {
@@ -167,7 +171,16 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             getChapterPages(sourceId = sourceId, chapterUrl = currentChapterUrl)
                 .onSuccess { pages ->
-                    _uiState.update { it.copy(pages = pages, isLoading = false) }
+                    if (pages.isEmpty()) {
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                error = "No pages found. This chapter may require a premium subscription.",
+                            )
+                        }
+                    } else {
+                        _uiState.update { it.copy(pages = pages, isLoading = false) }
+                    }
                 }
                 .onFailure { throwable ->
                     if (throwable is CancellationException) throw throwable

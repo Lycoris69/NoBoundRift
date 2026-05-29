@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.ViewDay
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -112,13 +113,22 @@ fun ReaderScreen(
             }
 
             uiState.error != null -> {
-                Text(
-                    text = uiState.error!!,
-                    color = MaterialTheme.colorScheme.error,
+                Column(
                     modifier = Modifier
                         .align(Alignment.Center)
                         .padding(32.dp),
-                )
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        text = uiState.error!!,
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center,
+                    )
+                    Button(onClick = viewModel::retry) {
+                        Text("Retry")
+                    }
+                }
             }
 
             else -> {

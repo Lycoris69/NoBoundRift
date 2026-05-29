@@ -14,4 +14,6 @@ data class Chapter(
     val read: Boolean = false,
     /** Unix epoch millis. 0 if the source does not expose upload dates. */
     val dateUpload: Long = 0L,
+    /** True while the chapter is behind a premium paywall. Not persisted in Room. */
+    val isLocked: Boolean = false,
 )

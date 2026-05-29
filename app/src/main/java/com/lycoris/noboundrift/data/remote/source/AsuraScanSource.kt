@@ -152,6 +152,27 @@ class AsuraScanSource @Inject constructor(
             val mangaId = mangaUrl.trimEnd('/').substringAfterLast('/')
             val doc = getDocument(mangaUrl)
 
+            // Build number->isLocked map from ChapterListReact props (more reliable than HTML).
+            val isLockedMap: Map<Float, Boolean> = runCatching {
+                val island = doc.selectFirst("astro-island[component-url*=ChapterListReact]")
+                    ?: return@runCatching emptyMap()
+                val propsRaw = island.attr("props").replace("&quot;", "\"")
+                val props = JSONObject(propsRaw)
+                val chaptersOuter = props.optJSONArray("chapters")
+                    ?: return@runCatching emptyMap()
+                val chaptersArray = chaptersOuter.optJSONArray(1)
+                    ?: return@runCatching emptyMap()
+                (0 until chaptersArray.length()).mapNotNull { i ->
+                    runCatching {
+                        val item = chaptersArray.getJSONArray(i)
+                        val obj = item.getJSONObject(1)
+                        val number = obj.getJSONArray("number").getDouble(1).toFloat()
+                        val isLocked = obj.getJSONArray("is_locked").getBoolean(1)
+                        number to isLocked
+                    }.getOrNull()
+                }.toMap()
+            }.getOrElse { emptyMap() }
+
             // Extract the manga path segment (e.g. "/comics/nano-machine-7b57f74d") to
             // filter out sidebar/related links that also contain "/chapter/".
             val mangaPath = mangaUrl.removePrefix(baseUrl).trimEnd('/')
@@ -178,6 +199,7 @@ class AsuraScanSource @Inject constructor(
                         number = number,
                         url = chapterUrl,
                         dateUpload = dateUpload,
+                        isLocked = isLockedMap[number] ?: false,
                     )
                 }
 
