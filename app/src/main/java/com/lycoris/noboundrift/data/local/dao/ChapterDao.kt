@@ -18,18 +18,34 @@ interface ChapterDao {
     suspend fun getByUrl(url: String): ChapterEntity?
 
     /**
-     * Returns the URL of the most recently read chapter for a manga, or null if none.
+     * Returns the URL of the most recently opened chapter for a manga, or null if none.
      * Used to resume reading from the correct chapter.
      */
     @Query(
         """
         SELECT chapterUrl FROM chapter_progress
-        WHERE mangaId = :mangaId AND read = 1
+        WHERE mangaId = :mangaId
         ORDER BY lastReadAt DESC
         LIMIT 1
         """
     )
     fun observeLastRead(mangaId: String): Flow<String?>
+
+    @Query(
+        """
+        INSERT INTO chapter_progress (chapterUrl, mangaId, title, number, read, dateUpload, lastReadAt)
+        VALUES (:chapterUrl, :mangaId, :title, :number, 0, :dateUpload, :timestamp)
+        ON CONFLICT(chapterUrl) DO UPDATE SET lastReadAt = :timestamp
+        """
+    )
+    suspend fun touchLastReadAt(
+        chapterUrl: String,
+        mangaId: String,
+        title: String,
+        number: Float,
+        dateUpload: Long,
+        timestamp: Long,
+    )
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrReplace(entity: ChapterEntity)

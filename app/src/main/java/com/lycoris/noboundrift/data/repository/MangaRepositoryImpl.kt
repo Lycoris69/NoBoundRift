@@ -92,6 +92,17 @@ class MangaRepositoryImpl @Inject constructor(
         )
     }
 
+    override suspend fun touchLastOpenedChapter(chapter: Chapter) {
+        chapterDao.touchLastReadAt(
+            chapterUrl = chapter.url,
+            mangaId = chapter.mangaId,
+            title = chapter.title,
+            number = chapter.number,
+            dateUpload = chapter.dateUpload,
+            timestamp = System.currentTimeMillis(),
+        )
+    }
+
     override suspend fun markChapterUnread(chapterUrl: String) {
         chapterDao.markUnread(chapterUrl)
     }

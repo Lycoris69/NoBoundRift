@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lycoris.noboundrift.domain.model.Chapter
 import com.lycoris.noboundrift.domain.model.Page
+import com.lycoris.noboundrift.domain.repository.MangaRepository
 import com.lycoris.noboundrift.domain.usecase.GetChapterListUseCase
 import com.lycoris.noboundrift.domain.usecase.GetChapterPagesUseCase
 import com.lycoris.noboundrift.domain.usecase.MarkChapterReadUseCase
@@ -45,6 +46,7 @@ class ReaderViewModel @Inject constructor(
     private val getChapterPages: GetChapterPagesUseCase,
     private val getChapterList: GetChapterListUseCase,
     private val markChapterRead: MarkChapterReadUseCase,
+    private val repository: MangaRepository,
 ) : ViewModel() {
 
     private val sourceId: Long = checkNotNull(savedStateHandle[Screen.Reader.ARG_SOURCE_ID])
@@ -98,29 +100,27 @@ class ReaderViewModel @Inject constructor(
         loadPages()
     }
 
-    /**
-     * Called when the user leaves the reader. Identifies which chapter segment
-     * the user is currently in (accounting for seamlessly appended chapters) and
-     * marks that chapter as read if they reached at least 80% through its pages.
-     */
     fun onExitReader() {
         val state = _uiState.value
         if (state.pages.isEmpty()) return
 
-        // Find which chapter segment the user is currently in
         val activeSegment = chapterSegments.lastOrNull { it.startIndex <= state.currentPageIndex }
             ?: return
+        val chapter = sortedChapters.find { it.url.trimEnd('/') == activeSegment.url.trimEnd('/') }
+            ?: return
+
+        viewModelScope.launch {
+            withContext(NonCancellable) { repository.touchLastOpenedChapter(chapter) }
+        }
+
         val nextSegmentStart = chapterSegments.firstOrNull { it.startIndex > state.currentPageIndex }?.startIndex
             ?: state.pages.size
-
         val chapterPageCount = nextSegmentStart - activeSegment.startIndex
         val pageWithinChapter = state.currentPageIndex - activeSegment.startIndex + 1
         if (chapterPageCount <= 0) return
 
         val progress = pageWithinChapter.toFloat() / chapterPageCount
         if (progress >= 0.8f) {
-            val chapter = sortedChapters.find { it.url.trimEnd('/') == activeSegment.url.trimEnd('/') }
-                ?: return
             viewModelScope.launch { withContext(NonCancellable) { markChapterRead(chapter) } }
         }
     }

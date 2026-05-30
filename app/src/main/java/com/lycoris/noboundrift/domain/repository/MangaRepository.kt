@@ -36,6 +36,8 @@ interface MangaRepository {
 
     suspend fun markChapterRead(chapter: Chapter)
 
+    suspend fun touchLastOpenedChapter(chapter: Chapter)
+
     suspend fun markChapterUnread(chapterUrl: String)
 
     /** Emits the last-read chapter URL for a given manga, or null if unread. */
