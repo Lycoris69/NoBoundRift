@@ -9,7 +9,7 @@ import com.lycoris.noboundrift.data.local.entity.MangaEntity
 
 @Database(
     entities = [MangaEntity::class, ChapterEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class NoBoundRiftDatabase : RoomDatabase() {

@@ -12,9 +12,13 @@ Personal Android manga and webtoon reader. Content is sourced by scraping third-
 - Browse and search manga/webtoon from multiple sources
 - Manga detail page with chapter list — sortable oldest-first or newest-first
 - Two reading modes: webtoon scroll and page-by-page flip
-- Auto-load next chapter when reaching the end of a chapter
-- Local library — bookmark titles and track reading progress
+- Seamless auto-load of the next chapter when reaching the end
+- **Continue Reading** — resumes the exact chapter you were on when you last exited
 - Chapter marked as read automatically at 80%+ progress
+- Local library — bookmark titles and track reading progress
+- **Drag-to-reorder library** — long-press a cover then drag to reposition it
+- Lock icon on premium/paywalled chapters
+- User-friendly error screen with Retry instead of a crash
 
 ## Sources
 
@@ -22,6 +26,7 @@ Personal Android manga and webtoon reader. Content is sourced by scraping third-
 |--------|------|--------|
 | MangaRead | mangaread.org | Jsoup scraper |
 | Manhwaz | manhwaz.com | Jsoup scraper |
+| AsuraScans | asurascans.com | Jsoup + Astro SSR JSON props |
 
 ## Stack
 

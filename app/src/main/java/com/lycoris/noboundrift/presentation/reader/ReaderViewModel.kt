@@ -109,19 +109,17 @@ class ReaderViewModel @Inject constructor(
         val chapter = sortedChapters.find { it.url.trimEnd('/') == activeSegment.url.trimEnd('/') }
             ?: return
 
-        viewModelScope.launch {
-            withContext(NonCancellable) { repository.touchLastOpenedChapter(chapter) }
-        }
-
         val nextSegmentStart = chapterSegments.firstOrNull { it.startIndex > state.currentPageIndex }?.startIndex
             ?: state.pages.size
         val chapterPageCount = nextSegmentStart - activeSegment.startIndex
         val pageWithinChapter = state.currentPageIndex - activeSegment.startIndex + 1
-        if (chapterPageCount <= 0) return
+        val shouldMarkRead = chapterPageCount > 0 && (pageWithinChapter.toFloat() / chapterPageCount) >= 0.8f
 
-        val progress = pageWithinChapter.toFloat() / chapterPageCount
-        if (progress >= 0.8f) {
-            viewModelScope.launch { withContext(NonCancellable) { markChapterRead(chapter) } }
+        viewModelScope.launch {
+            withContext(NonCancellable) {
+                repository.touchLastOpenedChapter(chapter)
+                if (shouldMarkRead) markChapterRead(chapter)
+            }
         }
     }
 

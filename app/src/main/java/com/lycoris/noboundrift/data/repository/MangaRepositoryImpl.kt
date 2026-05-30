@@ -62,7 +62,18 @@ class MangaRepositoryImpl @Inject constructor(
         mangaDao.observeAll().map { entities -> entities.map { it.toPreview() } }
 
     override suspend fun addToLibrary(manga: MangaPreview) {
-        mangaDao.insert(manga.toEntity())
+        val now = System.currentTimeMillis()
+        mangaDao.insert(
+            MangaEntity(
+                id = manga.id,
+                title = manga.title,
+                coverUrl = manga.coverUrl,
+                sourceId = manga.sourceId,
+                url = manga.url,
+                addedAt = now,
+                sortOrder = now,
+            )
+        )
     }
 
     override suspend fun removeFromLibrary(mangaId: String) {
@@ -76,12 +87,16 @@ class MangaRepositoryImpl @Inject constructor(
         mangaDao.updateLatestChapterAt(mangaId, latestAt)
     }
 
+    override suspend fun reorderLibrary(orderedIds: List<String>) {
+        mangaDao.reorderAll(orderedIds)
+    }
+
     // ── Reading progress ──────────────────────────────────────────────────────
 
     override suspend fun markChapterRead(chapter: Chapter) {
         chapterDao.insertOrReplace(
             ChapterEntity(
-                chapterUrl = chapter.url,
+                chapterUrl = chapter.url.trimEnd('/'),
                 mangaId = chapter.mangaId,
                 title = chapter.title,
                 number = chapter.number,
@@ -94,7 +109,7 @@ class MangaRepositoryImpl @Inject constructor(
 
     override suspend fun touchLastOpenedChapter(chapter: Chapter) {
         chapterDao.touchLastReadAt(
-            chapterUrl = chapter.url,
+            chapterUrl = chapter.url.trimEnd('/'),
             mangaId = chapter.mangaId,
             title = chapter.title,
             number = chapter.number,
@@ -121,11 +136,4 @@ class MangaRepositoryImpl @Inject constructor(
         latestChapterAt = latestChapterAt,
     )
 
-    private fun MangaPreview.toEntity() = MangaEntity(
-        id = id,
-        title = title,
-        coverUrl = coverUrl,
-        sourceId = sourceId,
-        url = url,
-    )
 }

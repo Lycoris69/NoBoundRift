@@ -4,13 +4,14 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.lycoris.noboundrift.data.local.entity.MangaEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface MangaDao {
 
-    @Query("SELECT * FROM manga_library ORDER BY CASE WHEN latestChapterAt > 0 THEN latestChapterAt ELSE addedAt END DESC")
+    @Query("SELECT * FROM manga_library ORDER BY sortOrder ASC")
     fun observeAll(): Flow<List<MangaEntity>>
 
     @Query("SELECT * FROM manga_library WHERE id = :mangaId")
@@ -27,4 +28,14 @@ interface MangaDao {
 
     @Query("UPDATE manga_library SET latestChapterAt = :latestAt WHERE id = :mangaId")
     suspend fun updateLatestChapterAt(mangaId: String, latestAt: Long)
+
+    @Query("UPDATE manga_library SET sortOrder = :order WHERE id = :id")
+    suspend fun updateSortOrder(id: String, order: Long)
+
+    @Transaction
+    suspend fun reorderAll(orderedIds: List<String>) {
+        orderedIds.forEachIndexed { index, id ->
+            updateSortOrder(id, index.toLong() * 1_000L)
+        }
+    }
 }

@@ -32,6 +32,8 @@ interface MangaRepository {
 
     suspend fun updateLatestChapterAt(mangaId: String, latestAt: Long)
 
+    suspend fun reorderLibrary(orderedIds: List<String>)
+
     // ── Reading progress ──────────────────────────────────────────────────────
 
     suspend fun markChapterRead(chapter: Chapter)

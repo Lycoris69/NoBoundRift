@@ -135,7 +135,7 @@ private fun MangaDetail(
     onToggleOrder: () -> Unit,
     onChapterClick: (Chapter) -> Unit,
 ) {
-    val continueChapter = lastReadChapterUrl?.let { url -> manga.chapters.find { it.url == url } }
+    val continueChapter = lastReadChapterUrl?.let { url -> manga.chapters.find { it.url.trimEnd('/') == url } }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
