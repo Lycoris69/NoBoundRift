@@ -94,7 +94,7 @@ class DetailViewModel @Inject constructor(
                     if (latestAt > 0L) {
                         launch { repository.updateLatestChapterAt(manga.id, latestAt) }
                     }
-
+    
                     // Both observers are children of loadJob — cancelled automatically when loadJob is cancelled
                     launch {
                         repository.isInLibrary(manga.id).collect { inLib ->

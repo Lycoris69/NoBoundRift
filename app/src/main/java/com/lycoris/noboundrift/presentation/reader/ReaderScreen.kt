@@ -25,6 +25,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -56,8 +57,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
 import com.lycoris.noboundrift.domain.model.Page
 
 /**
@@ -143,6 +144,7 @@ fun ReaderScreen(
                     ReaderMode.WEBTOON -> key(uiState.chapterKey) {
                         WebtoonReader(
                             pages = uiState.pages,
+                            imageRetryKey = uiState.imageRetryKey,
                             isLoadingNextChapter = uiState.isLoadingNextChapter,
                             onPageVisible = viewModel::onPageChanged,
                             onNearEnd = viewModel::onNearEnd,
@@ -152,6 +154,7 @@ fun ReaderScreen(
                     ReaderMode.PAGE_FLIP -> key(uiState.chapterKey) {
                         PageFlipReader(
                             pages = uiState.pages,
+                            imageRetryKey = uiState.imageRetryKey,
                             currentPage = uiState.currentPageIndex,
                             onPageChanged = viewModel::onPageChanged,
                             onNearEnd = viewModel::onNearEnd,
@@ -179,6 +182,7 @@ fun ReaderScreen(
                         onToggleMode = viewModel::toggleReaderMode,
                         onPrevChapter = viewModel::goToPrevChapter,
                         onNextChapter = viewModel::goToNextChapter,
+                        onRetryImages = viewModel::retryImages,
                     )
                 }
             }
@@ -191,6 +195,7 @@ fun ReaderScreen(
 @Composable
 private fun WebtoonReader(
     pages: List<Page>,
+    imageRetryKey: Int,
     isLoadingNextChapter: Boolean,
     onPageVisible: (Int) -> Unit,
     onNearEnd: () -> Unit,
@@ -221,6 +226,7 @@ private fun WebtoonReader(
         itemsIndexed(pages, key = { _, page -> page.index }) { _, page ->
             PageImage(
                 page = page,
+                imageRetryKey = imageRetryKey,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -247,6 +253,7 @@ private fun WebtoonReader(
 @Composable
 private fun PageFlipReader(
     pages: List<Page>,
+    imageRetryKey: Int,
     currentPage: Int,
     onPageChanged: (Int) -> Unit,
     onNearEnd: () -> Unit,
@@ -273,7 +280,7 @@ private fun PageFlipReader(
         modifier = modifier.fillMaxSize(),
     ) { pageIndex ->
         pages.getOrNull(pageIndex)?.let { page ->
-            PageImage(page = page, modifier = Modifier.fillMaxSize())
+            PageImage(page = page, imageRetryKey = imageRetryKey, modifier = Modifier.fillMaxSize())
         }
     }
 }
@@ -281,9 +288,19 @@ private fun PageFlipReader(
 // ── Shared page image ─────────────────────────────────────────────────────
 
 @Composable
-private fun PageImage(page: Page, modifier: Modifier = Modifier) {
+private fun PageImage(page: Page, imageRetryKey: Int, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val model = remember(page.imageUrl, imageRetryKey) {
+        ImageRequest.Builder(context)
+            .data(page.imageUrl)
+            .memoryCacheKey("${page.imageUrl}:$imageRetryKey")
+            // Also bust the disk cache on retry so a previously bad/partial download
+            // doesn't get served again (memory cache key alone is insufficient).
+            .diskCacheKey("${page.imageUrl}:$imageRetryKey")
+            .build()
+    }
     SubcomposeAsyncImage(
-        model = page.imageUrl,
+        model = model,
         contentDescription = "Page ${page.index + 1}",
         contentScale = ContentScale.FillWidth,
         modifier = modifier,
@@ -325,6 +342,7 @@ private fun ReaderTopBar(
     onToggleMode: () -> Unit,
     onPrevChapter: () -> Unit,
     onNextChapter: () -> Unit,
+    onRetryImages: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -381,6 +399,13 @@ private fun ReaderTopBar(
                 imageVector = if (readerMode == ReaderMode.WEBTOON) Icons.Default.SwapHoriz
                 else Icons.Default.ViewDay,
                 contentDescription = "Toggle reader mode",
+                tint = Color.White,
+            )
+        }
+        IconButton(onClick = onRetryImages) {
+            Icon(
+                imageVector = Icons.Default.Refresh,
+                contentDescription = "Retry failed images",
                 tint = Color.White,
             )
         }

@@ -38,6 +38,7 @@ data class ReaderUiState(
     val chapterKey: Int = 0,
     val mangaTitle: String = "",
     val currentChapterTitle: String = "",
+    val imageRetryKey: Int = 0,
 )
 
 @HiltViewModel
@@ -92,12 +93,31 @@ class ReaderViewModel @Inject constructor(
     }
 
     fun onPageChanged(index: Int) {
-        _uiState.update { it.copy(currentPageIndex = index) }
+        val activeSegment = chapterSegments.lastOrNull { it.startIndex <= index }
+        if (activeSegment != null && activeSegment.url.trimEnd('/') != currentChapterUrl.trimEnd('/')) {
+            currentChapterUrl = activeSegment.url
+            val newTitle = chapterTitleFor(activeSegment.url)
+            _uiState.update {
+                it.copy(
+                    currentPageIndex = index,
+                    currentChapterTitle = newTitle.ifEmpty { it.currentChapterTitle },
+                    canGoToPrevChapter = findPrevBefore(activeSegment.url) != null,
+                    canGoToNextChapter = findNextAfter(activeSegment.url) != null,
+                )
+            }
+        } else {
+            _uiState.update { it.copy(currentPageIndex = index) }
+        }
     }
 
     fun retry() {
         _uiState.update { it.copy(error = null, isLoading = true) }
         loadPages()
+    }
+
+    /** Increments [ReaderUiState.imageRetryKey], causing all [PageImage]s to bust their cache. */
+    fun retryImages() {
+        _uiState.update { it.copy(imageRetryKey = it.imageRetryKey + 1) }
     }
 
     fun onExitReader() {
