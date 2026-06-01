@@ -18,7 +18,7 @@ import javax.inject.Inject
  * [Source] implementation for Manhwaz (manhwaz.com).
  * Site runs the Madara WordPress manga theme.
  *
- * // Selectors verified: 2025-05-27
+ * // Selectors verified: 2026-06-01
  */
 class ManhwazSource @Inject constructor(
     private val okHttpClient: OkHttpClient,
@@ -88,13 +88,16 @@ class ManhwazSource @Inject constructor(
     }
 
     /**
-     * Fetches the WordPress search results page for [query].
-     * Uses the standard Madara/WordPress search endpoint (same pattern as MangaRead).
-     * Selector verified: 2025-05-28
+     * Fetches the search results page for [query].
+     * Endpoint: /search?s={query} (NOT /?s=...&post_type=wp-manga — that returns the homepage).
+     * Search results use the same div.page-item-detail / .item-thumb structure as the browse
+     * grid, so parseMangaCards handles both. Cover images appear in the plain `src` attribute
+     * on the search page (no `data-src`), which the parseMangaCards fallback already handles.
+     * Verified: 2026-06-01
      */
     private fun fetchSearchResults(query: String): List<MangaPreview> {
         val encoded = URLEncoder.encode(query, "UTF-8")
-        val doc = getDocument("$baseUrl/?s=$encoded&post_type=wp-manga")
+        val doc = getDocument("$baseUrl/search?s=$encoded")
         return parseMangaCards(doc)
     }
 

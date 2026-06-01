@@ -74,18 +74,27 @@ class AsuraScanSource @Inject constructor(
         return parseMangaCards(doc)
     }
 
-    // Selectors verified: 2026-05-29
+    // Selectors verified: 2026-06-01
+    // Handles both relative hrefs (/comics/...) and absolute hrefs (https://asurascans.com/comics/...)
+    // so the same parser works for both browse and search result pages.
     private fun parseMangaCards(doc: Document): List<MangaPreview> {
-        return doc.select("a[href^=/comics/]:has(img[src*=asura-images/covers])").mapNotNull { anchor ->
+        return doc.select("a:has(img)").mapNotNull { anchor ->
+            val href = anchor.attr("href").trim()
+            if (href.isBlank()) return@mapNotNull null
+            // Accept only manga-level links; skip chapter-level links
+            val isRelativeComics = href.startsWith("/comics/") && !href.contains("/chapter/")
+            val isAbsoluteComics = href.contains("$baseUrl/comics/") && !href.contains("/chapter/")
+            if (!isRelativeComics && !isAbsoluteComics) return@mapNotNull null
+
             val img = anchor.selectFirst("img") ?: return@mapNotNull null
             val title = img.attr("alt").trim()
             if (title.isBlank()) return@mapNotNull null
 
-            val relativeHref = anchor.attr("href")
-            if (relativeHref.isBlank()) return@mapNotNull null
-            val mangaUrl = baseUrl + relativeHref
+            val mangaUrl = if (href.startsWith("http")) href else baseUrl + href
+            val relativeHref = if (href.startsWith("http")) href.removePrefix(baseUrl) else href
 
-            val coverUrl = img.attr("src").trim()
+            val coverUrl = img.attr("src").trim().takeIf { it.isNotBlank() }
+                ?: img.attr("data-src").trim().ifBlank { "" }
             val mangaId = relativeHref.trimEnd('/').substringAfterLast('/')
 
             MangaPreview(id = mangaId, title = title, coverUrl = coverUrl, sourceId = id, url = mangaUrl)
