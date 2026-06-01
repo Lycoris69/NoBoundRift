@@ -84,6 +84,24 @@ fun MangaCard(
                     )
                 }
             }
+            if (preview.title.trimEnd().lowercase().endsWith("raw")) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(4.dp)
+                        .background(
+                            color = Color(0xFF1565C0),
+                            shape = RoundedCornerShape(4.dp),
+                        )
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                ) {
+                    Text(
+                        text = "RAW",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                    )
+                }
+            }
         }
     }
 }
