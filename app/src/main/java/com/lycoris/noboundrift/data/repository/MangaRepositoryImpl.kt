@@ -45,9 +45,12 @@ class MangaRepositoryImpl @Inject constructor(
     override suspend fun fetchChapterList(sourceId: Long, mangaUrl: String): Result<List<Chapter>> =
         resultCatching {
             val chapters = sourceManager.getSource(sourceId).fetchChapterList(mangaUrl)
+            // Normalize scraped URLs the same way Room stores them (trimEnd('/')) so the
+            // batch lookup matches the primary keys in chapter_progress.
+            val normalizedUrls = chapters.map { it.url.trimEnd('/') }
+            val readUrlSet = chapterDao.getReadUrls(normalizedUrls).toHashSet()
             chapters.map { chapter ->
-                val local = chapterDao.getByUrl(chapter.url)
-                if (local != null) chapter.copy(read = local.read) else chapter
+                if (chapter.url.trimEnd('/') in readUrlSet) chapter.copy(read = true) else chapter
             }
         }
 

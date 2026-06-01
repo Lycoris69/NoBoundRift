@@ -8,10 +8,9 @@ import com.lycoris.noboundrift.domain.model.Page
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.jsoup.Jsoup
-import org.jsoup.nodes.Document
 import java.net.URLEncoder
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import javax.inject.Inject
 
 /**
@@ -21,27 +20,18 @@ import javax.inject.Inject
  * // Selectors verified: 2025-05-27
  */
 class MangaReadSource @Inject constructor(
-    private val okHttpClient: OkHttpClient,
-) : Source {
+    okHttpClient: OkHttpClient,
+) : BaseHttpSource(okHttpClient) {
 
     override val id: Long = 2L
     override val name: String = "MangaRead"
     override val baseUrl: String = "https://www.mangaread.org"
 
-    // ---------------------------------------------------------------------------
-    // Internal HTTP helpers
-    // ---------------------------------------------------------------------------
-
-    /**
-     * GETs [url] and returns the parsed [Document]. Blocking — must run on IO dispatcher.
-     */
-    private fun getDocument(url: String): Document {
-        val request = Request.Builder().url(url).build()
-        okHttpClient.newCall(request).execute().use { response ->
-            val body = response.body?.string()
-                ?: throw IllegalStateException("Empty response body from $url")
-            return Jsoup.parse(body, url)
-        }
+    companion object {
+        // DateTimeFormatter is immutable and thread-safe — declare once, reuse forever.
+        // Format: "dd.MM.yyyy" (e.g. "03.09.2025")
+        private val DATE_FORMATTER: DateTimeFormatter =
+            DateTimeFormatter.ofPattern("dd.MM.yyyy", Locale.ENGLISH)
     }
 
     // ---------------------------------------------------------------------------
@@ -176,7 +166,7 @@ class MangaReadSource @Inject constructor(
                     ?: index.toFloat()
 
                 val dateText = li.selectFirst(".chapter-release-date i")?.text()?.trim() ?: ""
-                val dateUpload = parseDateMillis(dateText)
+                val dateUpload = parseDateMillis(dateText, DATE_FORMATTER)
 
                 val chapterId = chapterUrl.trimEnd('/').substringAfterLast('/')
 
@@ -220,43 +210,4 @@ class MangaReadSource @Inject constructor(
                 }
         }
 
-    // ---------------------------------------------------------------------------
-    // Private helpers
-    // ---------------------------------------------------------------------------
-
-    private fun parseStatus(text: String): MangaStatus = when {
-        text.contains("ongoing", ignoreCase = true) -> MangaStatus.ONGOING
-        text.contains("completed", ignoreCase = true) -> MangaStatus.COMPLETED
-        text.contains("hiatus", ignoreCase = true) -> MangaStatus.HIATUS
-        text.contains("cancelled", ignoreCase = true) ||
-            text.contains("canceled", ignoreCase = true) -> MangaStatus.CANCELLED
-        else -> MangaStatus.UNKNOWN
-    }
-
-    // Selectors verified: 2026-05-29
-    // Date text is the inner text of .chapter-release-date i (no title attr).
-    // Format: "dd.MM.yyyy" for older chapters, relative "X days ago" for recent.
-    private fun parseDateMillis(text: String): Long {
-        if (text.isBlank()) return 0L
-        // Absolute: dd.MM.yyyy (e.g. "03.09.2025")
-        runCatching {
-            java.text.SimpleDateFormat("dd.MM.yyyy", java.util.Locale.ENGLISH)
-                .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
-                .parse(text)?.time
-        }.getOrNull()?.let { return it }
-        // Relative: "X mins/hours/days/weeks/months/years ago"
-        val match = Regex("(\\d+)\\s+(min|hour|day|week|month|year)s?\\s+ago", RegexOption.IGNORE_CASE)
-            .find(text) ?: return 0L
-        val amount = match.groupValues[1].toLong()
-        val unitMs = when (match.groupValues[2].lowercase()) {
-            "min"   -> 60_000L
-            "hour"  -> 3_600_000L
-            "day"   -> 86_400_000L
-            "week"  -> 7 * 86_400_000L
-            "month" -> 30 * 86_400_000L
-            "year"  -> 365 * 86_400_000L
-            else    -> return 0L
-        }
-        return System.currentTimeMillis() - amount * unitMs
-    }
 }

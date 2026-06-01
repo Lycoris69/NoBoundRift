@@ -38,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -135,7 +136,14 @@ private fun MangaDetail(
     onToggleOrder: () -> Unit,
     onChapterClick: (Chapter) -> Unit,
 ) {
-    val continueChapter = lastReadChapterUrl?.let { url -> manga.chapters.find { it.url.trimEnd('/') == url } }
+    val continueChapter = remember(manga.chapters, lastReadChapterUrl) {
+        lastReadChapterUrl?.let { url -> manga.chapters.find { it.url.trimEnd('/') == url } }
+    }
+
+    // Memoized so .reversed() only runs when chapters or sort order changes.
+    val displayedChapters = remember(manga.chapters, chaptersReversed) {
+        if (chaptersReversed) manga.chapters.reversed() else manga.chapters
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -233,7 +241,6 @@ private fun MangaDetail(
         }
 
         // Chapter rows
-        val displayedChapters = if (chaptersReversed) manga.chapters.reversed() else manga.chapters
         items(displayedChapters, key = { it.id }) { chapter ->
             ChapterRow(chapter = chapter, onClick = { onChapterClick(chapter) })
         }
@@ -283,7 +290,12 @@ private fun ChapterRow(chapter: Chapter, onClick: () -> Unit) {
     }
 }
 
+// DateTimeFormatter is immutable and thread-safe — declare once, reuse forever.
+private val CHAPTER_DATE_FORMATTER: java.time.format.DateTimeFormatter =
+    java.time.format.DateTimeFormatter.ofPattern("MMM d, yyyy", java.util.Locale.ENGLISH)
+
 private fun formatChapterDate(millis: Long): String =
-    java.text.SimpleDateFormat("MMM d, yyyy", java.util.Locale.ENGLISH)
-        .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
-        .format(java.util.Date(millis))
+    java.time.Instant.ofEpochMilli(millis)
+        .atZone(java.time.ZoneOffset.UTC)
+        .toLocalDate()
+        .format(CHAPTER_DATE_FORMATTER)

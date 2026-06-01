@@ -8,10 +8,10 @@ import com.lycoris.noboundrift.domain.model.Page
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import java.net.URLEncoder
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import javax.inject.Inject
 
 /**
@@ -21,31 +21,19 @@ import javax.inject.Inject
  * Selectors verified: 2026-06-01
  */
 class Manhwa18Source @Inject constructor(
-    private val okHttpClient: OkHttpClient,
-) : Source {
+    okHttpClient: OkHttpClient,
+) : BaseHttpSource(okHttpClient) {
+
+    companion object {
+        // DateTimeFormatter is immutable and thread-safe — declare once, reuse forever.
+        // Format: "dd MMM yyyy" (e.g. "25 May 2026")
+        private val DATE_FORMATTER: DateTimeFormatter =
+            DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH)
+    }
 
     override val id: Long = 5L
     override val name: String = "Manhwa18"
     override val baseUrl: String = "https://manhwa18.cc"
-
-    // ---------------------------------------------------------------------------
-    // Internal HTTP helpers
-    // ---------------------------------------------------------------------------
-
-    /**
-     * GETs [url] and returns the parsed [Document]. Blocking — must run on IO dispatcher.
-     */
-    private fun getDocument(url: String): Document {
-        val request = Request.Builder().url(url).build()
-        okHttpClient.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                throw IllegalStateException("HTTP ${response.code} from $url")
-            }
-            val body = response.body?.string()
-                ?: throw IllegalStateException("Empty response body from $url")
-            return Jsoup.parse(body, url)
-        }
-    }
 
     // ---------------------------------------------------------------------------
     // fetchMangaList
@@ -111,7 +99,7 @@ class Manhwa18Source @Inject constructor(
             if (mangaUrl.isBlank()) return@mapNotNull null
 
             val imgElement = element.selectFirst(".thumb img")
-            val rawCover = imgElement?.attr("data-src")?.takeIf { it.isNotBlank() }
+            val rawCover: String = imgElement?.attr("data-src")?.takeIf { it.isNotBlank() }
                 ?: imgElement?.attr("src") ?: ""
             val coverUrl = when {
                 rawCover.startsWith("//") -> "https:$rawCover"
@@ -226,7 +214,7 @@ class Manhwa18Source @Inject constructor(
 
                     // Date format: "dd MMM yyyy" (e.g. "25 May 2026") or absent for newest entry
                     val dateText = li.selectFirst("span.chapter-time")?.text()?.trim() ?: ""
-                    val dateUpload = parseDateMillis(dateText)
+                    val dateUpload = parseDateMillis(dateText, DATE_FORMATTER)
 
                     val chapterId = chapterUrl.trimEnd('/').substringAfterLast('/')
 
@@ -278,31 +266,4 @@ class Manhwa18Source @Inject constructor(
                 }
         }
 
-    // ---------------------------------------------------------------------------
-    // Private helpers
-    // ---------------------------------------------------------------------------
-
-    /**
-     * Parses date text from chapter list spans.
-     * Format: "dd MMM yyyy" (e.g. "25 May 2026"). Returns 0 if unparseable.
-     * Verified: 2026-06-01
-     */
-    private fun parseDateMillis(text: String): Long {
-        if (text.isBlank()) return 0L
-        runCatching {
-            java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.ENGLISH)
-                .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
-                .parse(text)?.time
-        }.getOrNull()?.let { return it }
-        return 0L
-    }
-
-    private fun parseStatus(text: String): MangaStatus = when {
-        text.contains("ongoing", ignoreCase = true) -> MangaStatus.ONGOING
-        text.contains("completed", ignoreCase = true) -> MangaStatus.COMPLETED
-        text.contains("hiatus", ignoreCase = true) -> MangaStatus.HIATUS
-        text.contains("cancelled", ignoreCase = true) ||
-            text.contains("canceled", ignoreCase = true) -> MangaStatus.CANCELLED
-        else -> MangaStatus.UNKNOWN
-    }
 }

@@ -5,6 +5,7 @@ import okhttp3.CookieJar
 import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 /**
@@ -24,13 +25,26 @@ object NetworkClient {
         "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 
-    private val cookieStore = HashMap<String, MutableList<Cookie>>()
+    // ConcurrentHashMap prevents data races when multiple IO coroutines save/load cookies
+    // concurrently (e.g. parallel chapter fetches across different sources).
+    private val cookieStore = ConcurrentHashMap<String, ConcurrentHashMap<String, Cookie>>()
+
     private val cookieJar = object : CookieJar {
         override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-            cookieStore.getOrPut(url.host) { mutableListOf() }.addAll(cookies)
+            val hostMap = cookieStore.getOrPut(url.host) { ConcurrentHashMap() }
+            val now = System.currentTimeMillis()
+            for (cookie in cookies) {
+                // Drop expired persistent cookies; non-persistent (session) cookies have
+                // expiresAt = Long.MAX_VALUE so they always pass this check.
+                if (cookie.persistent && cookie.expiresAt < now) continue
+                // Key by name+domain to deduplicate: a newer Set-Cookie for the same
+                // name on the same domain replaces the old value rather than appending.
+                hostMap["${cookie.name}@${cookie.domain}"] = cookie
+            }
         }
+
         override fun loadForRequest(url: HttpUrl): List<Cookie> =
-            cookieStore[url.host] ?: emptyList()
+            cookieStore[url.host]?.values?.toList() ?: emptyList()
     }
 
     fun build(enableLogging: Boolean = false): OkHttpClient {

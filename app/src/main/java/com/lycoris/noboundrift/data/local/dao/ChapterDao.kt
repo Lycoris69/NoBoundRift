@@ -18,6 +18,13 @@ interface ChapterDao {
     suspend fun getByUrl(url: String): ChapterEntity?
 
     /**
+     * Returns the set of normalized chapter URLs (from [urls]) that have a read=true
+     * entry in the database. Used for batch read-state hydration to avoid N+1 queries.
+     */
+    @Query("SELECT chapterUrl FROM chapter_progress WHERE chapterUrl IN (:urls) AND read = 1")
+    suspend fun getReadUrls(urls: List<String>): List<String>
+
+    /**
      * Returns the URL of the most recently opened chapter for a manga, or null if none.
      * Used to resume reading from the correct chapter.
      */
