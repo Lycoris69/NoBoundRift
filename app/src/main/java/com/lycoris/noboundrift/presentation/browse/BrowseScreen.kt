@@ -144,7 +144,8 @@ private fun BrowseGrid(
 
     val isSearching = uiState.searchQuery.isNotBlank()
     val groups = remember(uiState.manga, isSearching) {
-        if (isSearching) null else groupByDate(uiState.manga)
+        if (isSearching) null
+        else groupByDate(uiState.manga).takeIf { it.today.isNotEmpty() || it.lastThreeDays.isNotEmpty() }
     }
 
     LazyVerticalGrid(
