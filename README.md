@@ -20,7 +20,6 @@ Personal Android manga and webtoon reader. Content is sourced by scraping third-
 - Lock icon on premium/paywalled chapters
 - User-friendly error screen with Retry instead of a crash
 - Image refresh button in the reader top bar to retry failed page loads
-- **RAW** badge on manga covers whose title ends with "Raw"
 
 ## Sources
 
@@ -29,7 +28,6 @@ Personal Android manga and webtoon reader. Content is sourced by scraping third-
 | MangaRead | mangaread.org | Jsoup scraper |
 | Manhwaz | manhwaz.com | Jsoup scraper |
 | AsuraScans | asurascans.com | Jsoup + Astro SSR JSON props |
-| Manhwa18 | manhwa18.cc | Jsoup scraper |
 
 ## Stack
 
