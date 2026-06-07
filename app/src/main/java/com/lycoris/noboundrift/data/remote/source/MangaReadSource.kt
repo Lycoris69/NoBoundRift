@@ -67,10 +67,10 @@ class MangaReadSource @Inject constructor(
                 ?: imgElement?.attr("src") ?: ""
             val coverUrl = if (rawCover.startsWith("//")) "https:$rawCover" else rawCover
 
-            // Madara browse cards include the latest chapter upload date in
-            // .chapter-item-time — falls back to 0 gracefully if the element is absent.
+            // Latest chapter date lives in span.post-on inside .chapter-item.
+            // Can be relative ("2 hours ago") or absolute ("01.06.2026").
             // Selector verified: 2026-06-07
-            val dateText = element.selectFirst(".chapter-item-time")?.text()?.trim() ?: ""
+            val dateText = element.selectFirst(".chapter-item .post-on")?.text()?.trim() ?: ""
             val latestChapterAt = parseDateMillis(dateText, DATE_FORMATTER)
 
             val mangaId = mangaUrl.trimEnd('/').substringAfterLast('/')

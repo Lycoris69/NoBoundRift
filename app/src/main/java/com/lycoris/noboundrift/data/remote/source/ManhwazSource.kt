@@ -72,10 +72,11 @@ class ManhwazSource @Inject constructor(
                 ?: imgElement?.attr("src") ?: ""
             val coverUrl = if (rawCover.startsWith("//")) "https:$rawCover" else rawCover
 
-            // Madara browse cards include the latest chapter upload date in
-            // .chapter-item-time — falls back to 0 gracefully if the element is absent.
+            // Manhwaz browse cards include the latest chapter upload date in
+            // span.post-on (e.g. "10 hours ago", "2 days ago").
+            // parseDateMillis handles relative expressions natively; no formatter needed.
             // Selector verified: 2026-06-07
-            val dateText = element.selectFirst(".chapter-item-time")?.text()?.trim() ?: ""
+            val dateText = element.selectFirst(".chapter-item .post-on")?.text()?.trim() ?: ""
             val latestChapterAt = parseDateMillis(dateText, DATE_FORMATTER)
 
             val mangaId = mangaUrl.trimEnd('/').substringAfterLast('/')
