@@ -297,6 +297,9 @@ private fun PageImage(page: Page, imageRetryKey: Int, modifier: Modifier = Modif
             // Also bust the disk cache on retry so a previously bad/partial download
             // doesn't get served again (memory cache key alone is insufficient).
             .diskCacheKey("${page.imageUrl}:$imageRetryKey")
+            .apply {
+                page.refererUrl?.let { addHeader("Referer", it) }
+            }
             .build()
     }
     SubcomposeAsyncImage(

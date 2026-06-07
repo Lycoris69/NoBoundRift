@@ -3,6 +3,7 @@ package com.lycoris.noboundrift.presentation.common
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -12,6 +13,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -21,6 +23,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.lycoris.noboundrift.domain.model.MangaPreview
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun MangaCard(
@@ -56,16 +61,33 @@ fun MangaCard(
                         )
                     )
             )
-            Text(
-                text = preview.title,
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(horizontal = 6.dp, vertical = 4.dp),
-            )
+            ) {
+                Text(
+                    text = preview.title,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (preview.latestChapterAt > 0L) {
+                    // Format the timestamp as a short absolute date: e.g. "Jun 3, 2026"
+                    val dateLabel = remember(preview.latestChapterAt) {
+                        SimpleDateFormat("MMM d, yyyy", Locale.ENGLISH)
+                            .format(Date(preview.latestChapterAt))
+                    }
+                    Text(
+                        text = dateLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.70f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
             if (showNewBadge) {
                 Box(
                     modifier = Modifier

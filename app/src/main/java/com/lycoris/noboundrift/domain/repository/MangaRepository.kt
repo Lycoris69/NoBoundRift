@@ -32,6 +32,12 @@ interface MangaRepository {
 
     suspend fun updateLatestChapterAt(mangaId: String, latestAt: Long)
 
+    /**
+     * Returns a map of manga ID → latestChapterAt for all [ids] that have a stored
+     * date in the library DB. IDs not in the library are absent from the result.
+     */
+    suspend fun getLatestChapterDates(ids: List<String>): Map<String, Long>
+
     suspend fun reorderLibrary(orderedIds: List<String>)
 
     // ── Reading progress ──────────────────────────────────────────────────────

@@ -67,8 +67,21 @@ class MangaReadSource @Inject constructor(
                 ?: imgElement?.attr("src") ?: ""
             val coverUrl = if (rawCover.startsWith("//")) "https:$rawCover" else rawCover
 
+            // Madara browse cards include the latest chapter upload date in
+            // .chapter-item-time — falls back to 0 gracefully if the element is absent.
+            // Selector verified: 2026-06-07
+            val dateText = element.selectFirst(".chapter-item-time")?.text()?.trim() ?: ""
+            val latestChapterAt = parseDateMillis(dateText, DATE_FORMATTER)
+
             val mangaId = mangaUrl.trimEnd('/').substringAfterLast('/')
-            MangaPreview(id = mangaId, title = title, coverUrl = coverUrl, sourceId = id, url = mangaUrl)
+            MangaPreview(
+                id = mangaId,
+                title = title,
+                coverUrl = coverUrl,
+                sourceId = id,
+                url = mangaUrl,
+                latestChapterAt = latestChapterAt,
+            )
         }
     }
 
@@ -206,7 +219,7 @@ class MangaReadSource @Inject constructor(
                         }
                     }
 
-                    Page(index = index, imageUrl = imageUrl)
+                    Page(index = index, imageUrl = imageUrl, refererUrl = chapterUrl)
                 }
         }
 

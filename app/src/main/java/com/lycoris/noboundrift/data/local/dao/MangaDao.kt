@@ -8,6 +8,9 @@ import androidx.room.Transaction
 import com.lycoris.noboundrift.data.local.entity.MangaEntity
 import kotlinx.coroutines.flow.Flow
 
+/** Lightweight projection returned by [MangaDao.getLatestChapterDates]. */
+data class MangaLatestDate(val id: String, val latestChapterAt: Long)
+
 @Dao
 interface MangaDao {
 
@@ -31,6 +34,13 @@ interface MangaDao {
 
     @Query("UPDATE manga_library SET sortOrder = :order WHERE id = :id")
     suspend fun updateSortOrder(id: String, order: Long)
+
+    /**
+     * Returns the latestChapterAt timestamp for each manga ID that exists in the library.
+     * IDs with no library entry are simply absent from the result.
+     */
+    @Query("SELECT id, latestChapterAt FROM manga_library WHERE id IN (:ids) AND latestChapterAt > 0")
+    suspend fun getLatestChapterDates(ids: List<String>): List<MangaLatestDate>
 
     @Transaction
     suspend fun reorderAll(orderedIds: List<String>) {

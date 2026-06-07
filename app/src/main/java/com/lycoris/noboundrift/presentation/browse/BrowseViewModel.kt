@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lycoris.noboundrift.data.local.SourcePreferences
 import com.lycoris.noboundrift.domain.model.MangaPreview
+import com.lycoris.noboundrift.domain.repository.MangaRepository
 import com.lycoris.noboundrift.domain.usecase.GetMangaListUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -30,6 +31,7 @@ data class BrowseUiState(
 class BrowseViewModel @Inject constructor(
     private val sourcePreferences: SourcePreferences,
     private val getMangaList: GetMangaListUseCase,
+    private val repository: MangaRepository,
 ) : ViewModel() {
 
     private var sourceId: Long = 0L
@@ -99,6 +101,40 @@ class BrowseViewModel @Inject constructor(
     // loadPage jobs can interleave their _uiState.update calls producing stale results.
     private var loadJob: Job? = null
 
+    // Enrichment coroutine: queries Room for stored latestChapterAt values and patches
+    // them into the browse list as a non-blocking second pass.
+    private var enrichJob: Job? = null
+
+    /**
+     * Queries Room for stored [MangaPreview.latestChapterAt] values and patches them into
+     * the current browse list. Runs as a fire-and-forget coroutine so the list is never
+     * blocked waiting for the DB round-trip. Any previous enrichment job is cancelled
+     * first to avoid stale data racing with a fresh load.
+     */
+    private fun enrichWithStoredDates() {
+        enrichJob?.cancel()
+        enrichJob = viewModelScope.launch {
+            val currentIds = _uiState.value.manga.map { it.id }
+            if (currentIds.isEmpty()) return@launch
+            runCatching { repository.getLatestChapterDates(currentIds) }
+                .onSuccess { dateMap ->
+                    if (dateMap.isEmpty()) return@onSuccess
+                    _uiState.update { state ->
+                        state.copy(
+                            manga = state.manga.map { preview ->
+                                val stored = dateMap[preview.id] ?: 0L
+                                // Prefer whichever timestamp is more recent: the scrape-provided
+                                // value (if the source parsed it from the card HTML) or the stored
+                                // Room value (written by DetailViewModel after a chapter-list fetch).
+                                if (stored > preview.latestChapterAt) preview.copy(latestChapterAt = stored)
+                                else preview
+                            }
+                        )
+                    }
+                }
+        }
+    }
+
     private fun loadPage(page: Int) {
         // Snapshot the query synchronously before launching — guarantees the launched
         // coroutine always uses the query that was current at call-site, not whatever
@@ -129,6 +165,10 @@ class BrowseViewModel @Inject constructor(
                             canLoadMore = newItems.isNotEmpty() && querySnapshot.isBlank(),
                         )
                     }
+                    // Non-blocking second pass: inject stored latestChapterAt from Room
+                    // for any manga the user has previously visited. The browse list is
+                    // already visible at this point — this only adds date labels.
+                    enrichWithStoredDates()
                 }
                 .onFailure { throwable ->
                     if (throwable is CancellationException) return@launch

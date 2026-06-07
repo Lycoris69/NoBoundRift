@@ -26,7 +26,7 @@ sealed interface DetailUiState {
         val manga: Manga,
         val isInLibrary: Boolean = false,
         val isLoadingChapters: Boolean = false,
-        val chaptersReversed: Boolean = false,
+        val chaptersReversed: Boolean = true,
         val lastReadChapterUrl: String? = null,
     ) : DetailUiState
     data class Error(val message: String) : DetailUiState

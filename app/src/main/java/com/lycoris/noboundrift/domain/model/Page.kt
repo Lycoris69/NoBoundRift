@@ -7,4 +7,5 @@ package com.lycoris.noboundrift.domain.model
 data class Page(
     val index: Int,
     val imageUrl: String,
+    val refererUrl: String? = null,
 )

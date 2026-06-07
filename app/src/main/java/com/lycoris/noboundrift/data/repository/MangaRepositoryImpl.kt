@@ -90,6 +90,9 @@ class MangaRepositoryImpl @Inject constructor(
         mangaDao.updateLatestChapterAt(mangaId, latestAt)
     }
 
+    override suspend fun getLatestChapterDates(ids: List<String>): Map<String, Long> =
+        mangaDao.getLatestChapterDates(ids).associate { it.id to it.latestChapterAt }
+
     override suspend fun reorderLibrary(orderedIds: List<String>) {
         mangaDao.reorderAll(orderedIds)
     }
