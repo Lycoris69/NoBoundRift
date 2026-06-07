@@ -152,6 +152,7 @@ class ReaderViewModel @Inject constructor(
         if (_uiState.value.isLoading) return   // guard: don't auto-append while initial pages are still loading
         if (_uiState.value.isLoadingNextChapter) return
         val url = nextChapterUrl ?: return
+        val completingUrl = currentChapterUrl  // capture before any state changes
 
         _uiState.update { it.copy(isLoadingNextChapter = true) }
         nearEndJob = viewModelScope.launch {
@@ -161,6 +162,10 @@ class ReaderViewModel @Inject constructor(
                         _uiState.update { it.copy(isLoadingNextChapter = false) }
                         return@onSuccess
                     }
+                    // Mark the just-completed chapter as read. NonCancellable ensures the
+                    // DB write goes through even if jumpToChapter cancels nearEndJob in flight.
+                    sortedChapters.find { it.url.trimEnd('/') == completingUrl.trimEnd('/') }
+                        ?.let { chapter -> withContext(NonCancellable) { markChapterRead(chapter) } }
                     // Record the segment boundary before appending (captures current page count)
                     chapterSegments.add(ChapterSegment(url, _uiState.value.pages.size))
                     val offset = _uiState.value.pages.size

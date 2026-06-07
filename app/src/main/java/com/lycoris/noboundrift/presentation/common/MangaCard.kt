@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.lycoris.noboundrift.domain.model.MangaPreview
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -73,18 +74,30 @@ fun MangaCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (preview.latestChapterAt > 0L) {
-                    // Format the timestamp as a short absolute date: e.g. "Jun 3, 2026"
-                    val dateLabel = remember(preview.latestChapterAt) {
+            }
+            if (preview.latestChapterAt > 0L) {
+                val dateLabel = remember(preview.latestChapterAt) {
+                    val cal = Calendar.getInstance().apply { timeInMillis = preview.latestChapterAt }
+                    val fmt = if (cal.get(Calendar.YEAR) == Calendar.getInstance().get(Calendar.YEAR))
+                        SimpleDateFormat("MMM d", Locale.ENGLISH)
+                    else
                         SimpleDateFormat("MMM d, yyyy", Locale.ENGLISH)
-                            .format(Date(preview.latestChapterAt))
-                    }
+                    fmt.format(Date(preview.latestChapterAt))
+                }
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(4.dp)
+                        .background(
+                            color = Color.Black.copy(alpha = 0.65f),
+                            shape = RoundedCornerShape(4.dp),
+                        )
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                ) {
                     Text(
                         text = dateLabel,
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.70f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        color = Color.White,
                     )
                 }
             }
