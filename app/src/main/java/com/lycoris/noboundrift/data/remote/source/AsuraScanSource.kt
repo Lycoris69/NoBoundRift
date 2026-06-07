@@ -65,7 +65,7 @@ class AsuraScanSource @Inject constructor(
             if (href.isBlank()) return@mapNotNull null
             // Accept only manga-level links; skip chapter-level links
             val isRelativeComics = href.startsWith("/comics/") && !href.contains("/chapter/")
-            val isAbsoluteComics = href.contains("$baseUrl/comics/") && !href.contains("/chapter/")
+            val isAbsoluteComics = href.startsWith("$baseUrl/comics/") && !href.contains("/chapter/")
             if (!isRelativeComics && !isAbsoluteComics) return@mapNotNull null
 
             val img = anchor.selectFirst("img") ?: return@mapNotNull null
@@ -113,8 +113,14 @@ class AsuraScanSource @Inject constructor(
                 }
             }
 
+            // Anchored after the "Status" label so we don't grab the first capitalize-classed
+            // span in the page (which may be an unrelated UI label). DOT_MATCHES_ALL bridges
+            // any whitespace or tags between the "Status" text and the value span.
             // Selectors verified: 2026-05-29
-            val statusMatch = Regex("""capitalize[^>]*>\s*(\w+)\s*</span>""").find(rawHtml)
+            val statusMatch = Regex(
+                """Status[^<]*<[^>]+capitalize[^>]*>\s*(\w+)\s*</span>""",
+                RegexOption.DOT_MATCHES_ALL
+            ).find(rawHtml)
             val statusText = statusMatch?.groupValues?.get(1)?.trim() ?: ""
             val status = parseStatus(statusText)
 
@@ -157,7 +163,10 @@ class AsuraScanSource @Inject constructor(
                     runCatching {
                         val item = chaptersArray.getJSONArray(i)
                         val obj = item.getJSONObject(1)
-                        val number = obj.getJSONArray("number").getDouble(1).toFloat()
+                        // Normalise via Double to match the precision path used on the href side
+                        // (href.substringAfterLast("/").toFloatOrNull()), avoiding any
+                        // direct-String-to-Float vs getDouble rounding divergence.
+                        val number = obj.getJSONArray("number").getDouble(1).toDouble().toFloat()
                         val isLocked = obj.getJSONArray("is_locked").getBoolean(1)
                         number to isLocked
                     }.getOrNull()

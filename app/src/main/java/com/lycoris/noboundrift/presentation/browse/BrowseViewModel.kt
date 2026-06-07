@@ -132,6 +132,7 @@ class BrowseViewModel @Inject constructor(
                         )
                     }
                 }
+                .onFailure { if (it is CancellationException) throw it }
         }
     }
 

@@ -119,6 +119,6 @@ fun MangaCard(
                     )
                 }
             }
-}
+        }
     }
 }

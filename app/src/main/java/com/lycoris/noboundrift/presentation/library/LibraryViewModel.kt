@@ -28,8 +28,12 @@ class LibraryViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
 
-    // When true, DB Flow emissions are ignored so in-flight saves don't reset the list
-    private var suppressDbUpdates = false
+    // Counter of in-flight reorder writes. DB Flow emissions are suppressed while > 0.
+    // Using a counter (not boolean) so a rapid cancel+relaunch can't clear the flag
+    // while a new write is already in flight: the old job's finally { -- } fires after
+    // the new job's ++ , keeping suppressDbUpdates true until the new write completes.
+    private var activeReorderWrites = 0
+    private val suppressDbUpdates get() = activeReorderWrites > 0
     private var reorderJob: Job? = null
 
     init {
@@ -54,11 +58,11 @@ class LibraryViewModel @Inject constructor(
         val orderedIds = _uiState.value.manga.map { it.id }
         reorderJob?.cancel()
         reorderJob = viewModelScope.launch {
-            suppressDbUpdates = true
+            activeReorderWrites++
             try {
                 repository.reorderLibrary(orderedIds)
             } finally {
-                suppressDbUpdates = false
+                activeReorderWrites--
             }
         }
     }
