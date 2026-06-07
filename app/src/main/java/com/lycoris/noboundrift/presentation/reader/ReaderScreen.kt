@@ -50,7 +50,9 @@ import kotlinx.coroutines.flow.map
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -59,6 +61,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
+import coil.size.Dimension
+import coil.size.Size as CoilSize
 import com.lycoris.noboundrift.domain.model.Page
 
 /**
@@ -290,13 +294,29 @@ private fun PageFlipReader(
 @Composable
 private fun PageImage(page: Page, imageRetryKey: Int, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val model = remember(page.imageUrl, imageRetryKey) {
+    val density = LocalDensity.current
+    val configuration = LocalConfiguration.current
+
+    // Webtoon strips can be 16 000+ px tall (one chapter = one long JPEG = ~46 MB decoded).
+    // Cap the decode height so Coil picks an inSampleSize that brings each bitmap down to
+    // a safe size. 4× screen height is generous enough to avoid visible quality loss while
+    // capping a 16 800 px image to inSampleSize=4 → ~1.4 MB with RGB_565.
+    val maxDecodePx = with(density) {
+        (configuration.screenHeightDp.dp.roundToPx() * 4).coerceAtMost(8192)
+    }
+
+    val model = remember(page.imageUrl, imageRetryKey, maxDecodePx) {
         ImageRequest.Builder(context)
             .data(page.imageUrl)
             .memoryCacheKey("${page.imageUrl}:$imageRetryKey")
             // Also bust the disk cache on retry so a previously bad/partial download
             // doesn't get served again (memory cache key alone is insufficient).
             .diskCacheKey("${page.imageUrl}:$imageRetryKey")
+            // Cap decode height → enables inSampleSize downsampling for tall strip images.
+            // Width is left undefined so SubcomposeAsyncImage can use the container width.
+            .size(CoilSize(Dimension.Undefined, Dimension.Pixels(maxDecodePx)))
+            // RGB_565 halves Bitmap memory for images without alpha (all manga pages).
+            .allowRgb565(true)
             .apply {
                 page.refererUrl?.let { addHeader("Referer", it) }
             }
