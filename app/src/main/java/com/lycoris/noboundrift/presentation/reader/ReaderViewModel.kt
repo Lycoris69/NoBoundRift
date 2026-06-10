@@ -284,13 +284,25 @@ class ReaderViewModel @Inject constructor(
     private fun findNextAfter(url: String): String? {
         val normalized = url.trimEnd('/')
         val idx = sortedChapters.indexOfFirst { it.url.trimEnd('/') == normalized }
-        return if (idx != -1 && idx + 1 < sortedChapters.size) sortedChapters[idx + 1].url else null
+        if (idx == -1) return null
+        val lang = sortedChapters[idx].language
+        return if (lang.isNotBlank()) {
+            sortedChapters.drop(idx + 1).firstOrNull { it.language == lang }?.url
+        } else {
+            if (idx + 1 < sortedChapters.size) sortedChapters[idx + 1].url else null
+        }
     }
 
     private fun findPrevBefore(url: String): String? {
         val normalized = url.trimEnd('/')
         val idx = sortedChapters.indexOfFirst { it.url.trimEnd('/') == normalized }
-        return if (idx > 0) sortedChapters[idx - 1].url else null
+        if (idx == -1) return null
+        val lang = sortedChapters[idx].language
+        return if (lang.isNotBlank()) {
+            sortedChapters.take(idx).lastOrNull { it.language == lang }?.url
+        } else {
+            if (idx > 0) sortedChapters[idx - 1].url else null
+        }
     }
 
     private fun ReaderMode.toggle() = when (this) {
