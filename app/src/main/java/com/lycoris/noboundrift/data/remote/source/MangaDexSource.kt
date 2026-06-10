@@ -145,13 +145,89 @@ class MangaDexSource @Inject constructor(
             )
         }
 
-    override suspend fun fetchChapterList(mangaUrl: String): List<Chapter> = emptyList()
+    override suspend fun fetchChapterList(mangaUrl: String): List<Chapter> =
+        withContext(Dispatchers.IO) {
+            val mangaId = mangaUrl.trimEnd('/').substringAfterLast('/')
+            val chapters = mutableListOf<Chapter>()
+            val limit = 100
+            var offset = 0
+            var total: Int
 
-    override suspend fun fetchPageList(chapterUrl: String): List<Page> {
-        throw IllegalStateException(
-            "Reading is not available for MangaDex titles. Use cross-source search to find this manga on a readable source."
-        )
-    }
+            do {
+                val url = "$apiBase/manga/$mangaId/feed" +
+                    "?translatedLanguage[]=en" +
+                    "&order[chapter]=asc" +
+                    "&limit=$limit" +
+                    "&offset=$offset" +
+                    "&contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica" +
+                    "&includeExternalUrl=0"
+                val json = getJson(url)
+                total = json.getInt("total")
+                val data = json.getJSONArray("data")
+
+                for (i in 0 until data.length()) {
+                    val obj = data.getJSONObject(i)
+                    val chapterId = obj.getString("id")
+                    val attrs = obj.getJSONObject("attributes")
+
+                    if (!attrs.isNull("externalUrl") && attrs.optString("externalUrl").isNotBlank()) continue
+                    if (attrs.optInt("pages", 0) == 0) continue
+
+                    val chapterStr = attrs.optString("chapter", "")
+                    val number = chapterStr.toFloatOrNull() ?: (chapters.size + offset).toFloat()
+
+                    val rawTitle = attrs.optString("title", "")
+                    val title = if (rawTitle.isNotBlank()) {
+                        rawTitle
+                    } else {
+                        val intNum = chapterStr.toFloatOrNull()?.let {
+                            if (it % 1 == 0f) it.toInt().toString() else chapterStr
+                        } ?: chapterStr
+                        if (intNum.isNotBlank()) "Chapter $intNum" else "Chapter ${chapters.size + offset + 1}"
+                    }
+
+                    val publishAt = attrs.optString("publishAt", "")
+                    val dateUpload = if (publishAt.isNotBlank()) {
+                        runCatching { OffsetDateTime.parse(publishAt).toInstant().toEpochMilli() }.getOrElse { 0L }
+                    } else {
+                        0L
+                    }
+
+                    chapters.add(
+                        Chapter(
+                            id = chapterId,
+                            mangaId = mangaId,
+                            title = title,
+                            number = number,
+                            url = "https://mangadex.org/chapter/$chapterId",
+                            dateUpload = dateUpload,
+                        )
+                    )
+                }
+
+                offset += data.length()
+            } while (offset < total)
+
+            chapters.sortedBy { it.number }
+        }
+
+    override suspend fun fetchPageList(chapterUrl: String): List<Page> =
+        withContext(Dispatchers.IO) {
+            val chapterId = chapterUrl.trimEnd('/').substringAfterLast('/')
+            val json = getJson("$apiBase/at-home/server/$chapterId")
+            val baseUrl = json.getString("baseUrl")
+            val chapterObj = json.getJSONObject("chapter")
+            val hash = chapterObj.getString("hash")
+            val dataArray = chapterObj.getJSONArray("data")
+
+            (0 until dataArray.length()).map { i ->
+                Page(
+                    index = i,
+                    imageUrl = "$baseUrl/data/$hash/${dataArray.getString(i)}",
+                    refererUrl = chapterUrl,
+                )
+            }
+        }
 
     private fun findCoverFileName(relationships: JSONArray): String? {
         for (i in 0 until relationships.length()) {
