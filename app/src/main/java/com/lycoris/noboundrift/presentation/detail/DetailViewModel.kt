@@ -28,6 +28,8 @@ sealed interface DetailUiState {
         val isLoadingChapters: Boolean = false,
         val chaptersReversed: Boolean = true,
         val lastReadChapterUrl: String? = null,
+        val availableLanguages: List<String> = emptyList(),
+        val selectedLanguage: String = "",
     ) : DetailUiState
     data class Error(val message: String) : DetailUiState
 }
@@ -61,6 +63,12 @@ class DetailViewModel @Inject constructor(
         }
     }
 
+    fun setLanguage(language: String) {
+        _uiState.update { state ->
+            (state as? DetailUiState.Success)?.copy(selectedLanguage = language) ?: state
+        }
+    }
+
     fun toggleLibrary() {
         val state = _uiState.value as? DetailUiState.Success ?: return
         viewModelScope.launch {
@@ -85,9 +93,13 @@ class DetailViewModel @Inject constructor(
                     val chapters = repository.fetchChapterList(sourceId, mangaUrl)
                         .getOrElse { emptyList() }
                     val mangaWithChapters = manga.copy(chapters = chapters)
+                    val languages = chapters.map { it.language }.filter { it.isNotBlank() }.distinct().sorted()
+                    val defaultLang = if ("en" in languages) "en" else languages.firstOrNull() ?: ""
                     _uiState.value = DetailUiState.Success(
                         manga = mangaWithChapters,
                         isLoadingChapters = false,
+                        availableLanguages = languages,
+                        selectedLanguage = defaultLang,
                     )
 
                     val latestAt = chapters.maxOfOrNull { it.dateUpload } ?: 0L

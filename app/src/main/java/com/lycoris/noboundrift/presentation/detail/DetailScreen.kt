@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -117,7 +119,10 @@ fun DetailScreen(
                         isLoadingChapters = state.isLoadingChapters,
                         chaptersReversed = state.chaptersReversed,
                         lastReadChapterUrl = state.lastReadChapterUrl,
+                        availableLanguages = state.availableLanguages,
+                        selectedLanguage = state.selectedLanguage,
                         onToggleOrder = viewModel::toggleChapterOrder,
+                        onLanguageSelect = viewModel::setLanguage,
                         onChapterClick = { chapter ->
                             onChapterClick(state.manga.sourceId, state.manga.url, chapter.url, state.manga.title)
                         },
@@ -128,23 +133,27 @@ fun DetailScreen(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun MangaDetail(
     manga: Manga,
     isLoadingChapters: Boolean,
     chaptersReversed: Boolean,
     lastReadChapterUrl: String?,
+    availableLanguages: List<String>,
+    selectedLanguage: String,
     onToggleOrder: () -> Unit,
+    onLanguageSelect: (String) -> Unit,
     onChapterClick: (Chapter) -> Unit,
 ) {
     val continueChapter = remember(manga.chapters, lastReadChapterUrl) {
         lastReadChapterUrl?.let { url -> manga.chapters.find { it.url.trimEnd('/') == url } }
     }
 
-    // Memoized so .reversed() only runs when chapters or sort order changes.
-    val displayedChapters = remember(manga.chapters, chaptersReversed) {
-        if (chaptersReversed) manga.chapters.reversed() else manga.chapters
+    val displayedChapters = remember(manga.chapters, chaptersReversed, selectedLanguage) {
+        val filtered = if (selectedLanguage.isBlank()) manga.chapters
+                       else manga.chapters.filter { it.language.isEmpty() || it.language == selectedLanguage }
+        if (chaptersReversed) filtered.reversed() else filtered
     }
 
     LazyColumn(
@@ -211,7 +220,7 @@ private fun MangaDetail(
                 modifier = Modifier.padding(top = 8.dp),
             ) {
                 Text(
-                    text = "${manga.chapters.size} Chapters",
+                    text = "${displayedChapters.size} Chapters",
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f),
                 )
@@ -225,6 +234,30 @@ private fun MangaDetail(
                         else Icons.Default.KeyboardArrowDown,
                         contentDescription = if (chaptersReversed) "Oldest first" else "Newest first",
                     )
+                }
+            }
+        }
+
+        // Language selector — only shown for multi-language sources (e.g. MangaDex)
+        if (availableLanguages.size > 1) {
+            item {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    contentPadding = PaddingValues(vertical = 4.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    items(availableLanguages) { lang ->
+                        FilterChip(
+                            selected = lang == selectedLanguage,
+                            onClick = { onLanguageSelect(lang) },
+                            label = {
+                                Text(
+                                    text = java.util.Locale(lang).displayLanguage.ifBlank { lang.uppercase() },
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            },
+                        )
+                    }
                 }
             }
         }

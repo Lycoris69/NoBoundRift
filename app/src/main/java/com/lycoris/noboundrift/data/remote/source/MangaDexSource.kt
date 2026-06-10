@@ -155,8 +155,7 @@ class MangaDexSource @Inject constructor(
 
             do {
                 val url = "$apiBase/manga/$mangaId/feed" +
-                    "?translatedLanguage[]=en" +
-                    "&order[chapter]=asc" +
+                    "?order[chapter]=asc" +
                     "&limit=$limit" +
                     "&offset=$offset" +
                     "&contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica" +
@@ -201,6 +200,7 @@ class MangaDexSource @Inject constructor(
                             number = number,
                             url = "https://mangadex.org/chapter/$chapterId",
                             dateUpload = dateUpload,
+                            language = attrs.optString("translatedLanguage", ""),
                         )
                     )
                 }
@@ -214,8 +214,9 @@ class MangaDexSource @Inject constructor(
     override suspend fun fetchPageList(chapterUrl: String): List<Page> =
         withContext(Dispatchers.IO) {
             val chapterId = chapterUrl.trimEnd('/').substringAfterLast('/')
+            // Still call at-home API for the hash — no other way to get it.
+            // Ignore the returned baseUrl (volunteer node); use the stable origin CDN instead.
             val json = getJson("$apiBase/at-home/server/$chapterId")
-            val baseUrl = json.getString("baseUrl")
             val chapterObj = json.getJSONObject("chapter")
             val hash = chapterObj.getString("hash")
             val dataArray = chapterObj.getJSONArray("data")
@@ -223,7 +224,7 @@ class MangaDexSource @Inject constructor(
             (0 until dataArray.length()).map { i ->
                 Page(
                     index = i,
-                    imageUrl = "$baseUrl/data/$hash/${dataArray.getString(i)}",
+                    imageUrl = "https://uploads.mangadex.org/data/$hash/${dataArray.getString(i)}",
                     refererUrl = chapterUrl,
                 )
             }

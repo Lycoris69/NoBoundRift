@@ -16,4 +16,5 @@ data class Chapter(
     val dateUpload: Long = 0L,
     /** True while the chapter is behind a premium paywall. Not persisted in Room. */
     val isLocked: Boolean = false,
+    val language: String = "",
 )
