@@ -300,10 +300,9 @@ private fun PageImage(page: Page, imageRetryKey: Int, modifier: Modifier = Modif
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
 
-    // Webtoon strips can be 16 000+ px tall (one chapter = one long JPEG = ~46 MB decoded).
-    // Cap the decode height so Coil picks an inSampleSize that brings each bitmap down to
-    // a safe size. 4× screen height is generous enough to avoid visible quality loss while
-    // capping a 16 800 px image to inSampleSize=4 → ~1.4 MB with RGB_565.
+    // Webtoon strips can be 16 000+ px tall. Cap the decode height so Coil picks an inSampleSize
+    // that keeps memory reasonable. 4× screen height is generous enough to avoid visible quality
+    // loss while preventing runaway allocation on extremely tall strips.
     val maxDecodePx = with(density) {
         (configuration.screenHeightDp.dp.roundToPx() * 4).coerceAtMost(8192)
     }
@@ -318,8 +317,6 @@ private fun PageImage(page: Page, imageRetryKey: Int, modifier: Modifier = Modif
             // Cap decode height → enables inSampleSize downsampling for tall strip images.
             // Width is left undefined so SubcomposeAsyncImage can use the container width.
             .size(CoilSize(Dimension.Undefined, Dimension.Pixels(maxDecodePx)))
-            // RGB_565 halves Bitmap memory for images without alpha (all manga pages).
-            .allowRgb565(true)
             .apply {
                 page.refererUrl?.let { addHeader("Referer", it) }
             }
