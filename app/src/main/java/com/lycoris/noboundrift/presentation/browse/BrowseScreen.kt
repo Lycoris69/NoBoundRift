@@ -44,6 +44,7 @@ fun BrowseScreen(
     viewModel: BrowseViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val allSourceNames = viewModel.allSourceNames
 
     Column(modifier = Modifier.fillMaxSize()) {
         SearchBar(
@@ -70,6 +71,7 @@ fun BrowseScreen(
                     uiState = uiState,
                     onMangaClick = onMangaClick,
                     onLoadMore = viewModel::loadNextPage,
+                    allSourceNames = allSourceNames,
                 )
             }
         }
@@ -127,6 +129,7 @@ private fun BrowseGrid(
     uiState: BrowseUiState,
     onMangaClick: (MangaPreview) -> Unit,
     onLoadMore: () -> Unit,
+    allSourceNames: Map<Long, String>,
 ) {
     val gridState = rememberLazyGridState()
 
@@ -143,8 +146,9 @@ private fun BrowseGrid(
     }
 
     val isSearching = uiState.searchQuery.isNotBlank()
-    val groups = remember(uiState.manga, isSearching) {
-        if (isSearching) null
+    val isCrossSourceSearch = uiState.isCrossSourceSearch
+    val groups = remember(uiState.manga, isSearching, isCrossSourceSearch) {
+        if (isSearching || isCrossSourceSearch) null
         else groupByDate(uiState.manga).takeIf { it.today.isNotEmpty() || it.lastThreeDays.isNotEmpty() }
     }
 
@@ -156,7 +160,25 @@ private fun BrowseGrid(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
-        if (groups != null) {
+        if (isCrossSourceSearch) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Text(
+                    text = "No results on this source — showing results from other sources",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+            }
+            items(uiState.manga, key = { "${it.sourceId}_${it.id}" }) { preview ->
+                MangaCard(
+                    preview = preview,
+                    onClick = { onMangaClick(preview) },
+                    sourceLabel = allSourceNames[preview.sourceId],
+                )
+            }
+        } else if (groups != null) {
             if (groups.today.isNotEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) { DateSectionHeader("Today") }
                 items(groups.today, key = { it.id }) { preview ->

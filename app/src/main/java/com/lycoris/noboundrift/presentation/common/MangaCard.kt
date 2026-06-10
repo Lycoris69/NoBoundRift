@@ -34,6 +34,7 @@ fun MangaCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     showNewBadge: Boolean = false,
+    sourceLabel: String? = null,
 ) {
     Card(
         modifier = modifier
@@ -116,6 +117,24 @@ fun MangaCard(
                         text = "NEW",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onError,
+                    )
+                }
+            }
+            if (sourceLabel != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(4.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                            shape = RoundedCornerShape(4.dp),
+                        )
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                ) {
+                    Text(
+                        text = sourceLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimary,
                     )
                 }
             }

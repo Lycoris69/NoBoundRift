@@ -3,12 +3,15 @@ package com.lycoris.noboundrift.presentation.browse
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lycoris.noboundrift.data.local.SourcePreferences
+import com.lycoris.noboundrift.data.remote.source.SourceManager
 import com.lycoris.noboundrift.domain.model.MangaPreview
 import com.lycoris.noboundrift.domain.repository.MangaRepository
 import com.lycoris.noboundrift.domain.usecase.GetMangaListUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +28,7 @@ data class BrowseUiState(
     val currentPage: Int = 1,
     val canLoadMore: Boolean = true,
     val searchQuery: String = "",
+    val isCrossSourceSearch: Boolean = false,
 )
 
 @HiltViewModel
@@ -32,7 +36,10 @@ class BrowseViewModel @Inject constructor(
     private val sourcePreferences: SourcePreferences,
     private val getMangaList: GetMangaListUseCase,
     private val repository: MangaRepository,
+    private val sourceManager: SourceManager,
 ) : ViewModel() {
+
+    val allSourceNames: Map<Long, String> = sourceManager.getAllSources().associate { it.id to it.name }
 
     private var sourceId: Long = 0L
 
@@ -51,6 +58,7 @@ class BrowseViewModel @Inject constructor(
                     sourceId = newSourceId
                     searchJob?.cancel()
                     loadJob?.cancel()
+                    crossSourceJob?.cancel()
                     _uiState.update { BrowseUiState(searchQuery = it.searchQuery) }
                     loadPage(page = 1)
                 }
@@ -88,6 +96,7 @@ class BrowseViewModel @Inject constructor(
         }
         searchJob?.cancel()
         loadJob?.cancel()
+        crossSourceJob?.cancel()
         searchJob = viewModelScope.launch {
             delay(400)
             loadPage(page = 1)
@@ -100,6 +109,8 @@ class BrowseViewModel @Inject constructor(
     // fires before the previous network call completes. Without this, two concurrent
     // loadPage jobs can interleave their _uiState.update calls producing stale results.
     private var loadJob: Job? = null
+
+    private var crossSourceJob: Job? = null
 
     // Enrichment coroutine: queries Room for stored latestChapterAt values and patches
     // them into the browse list as a non-blocking second pass.
@@ -145,7 +156,7 @@ class BrowseViewModel @Inject constructor(
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             if (page == 1) {
-                _uiState.update { it.copy(isLoading = true, error = null) }
+                _uiState.update { it.copy(isLoading = true, error = null, isCrossSourceSearch = false) }
             } else {
                 _uiState.update { it.copy(isLoadingMore = true) }
             }
@@ -166,10 +177,14 @@ class BrowseViewModel @Inject constructor(
                             canLoadMore = newItems.isNotEmpty() && querySnapshot.isBlank(),
                         )
                     }
-                    // Non-blocking second pass: inject stored latestChapterAt from Room
-                    // for any manga the user has previously visited. The browse list is
-                    // already visible at this point — this only adds date labels.
-                    enrichWithStoredDates()
+                    if (newItems.isEmpty() && querySnapshot.isNotBlank()) {
+                        launchCrossSourceSearch(querySnapshot)
+                    } else {
+                        // Non-blocking second pass: inject stored latestChapterAt from Room
+                        // for any manga the user has previously visited. The browse list is
+                        // already visible at this point — this only adds date labels.
+                        enrichWithStoredDates()
+                    }
                 }
                 .onFailure { throwable ->
                     if (throwable is CancellationException) return@launch
@@ -181,6 +196,33 @@ class BrowseViewModel @Inject constructor(
                         )
                     }
                 }
+        }
+    }
+
+    private fun launchCrossSourceSearch(query: String) {
+        crossSourceJob?.cancel()
+        crossSourceJob = viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            val otherSources = sourceManager.getAllSources().filter { it.id != sourceId }
+            val deferreds = otherSources.map { source ->
+                async {
+                    runCatching {
+                        getMangaList(sourceId = source.id, page = 1, query = query)
+                            .getOrElse { emptyList() }
+                    }
+                        .onFailure { if (it is CancellationException) throw it }
+                        .getOrElse { emptyList() }
+                }
+            }
+            val allResults = deferreds.awaitAll().flatten().distinctBy { it.url }
+            _uiState.update {
+                it.copy(
+                    manga = allResults,
+                    isLoading = false,
+                    isCrossSourceSearch = allResults.isNotEmpty(),
+                    canLoadMore = false,
+                )
+            }
         }
     }
 }
