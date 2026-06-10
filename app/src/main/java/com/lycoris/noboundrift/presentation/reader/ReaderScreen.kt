@@ -85,7 +85,8 @@ fun ReaderScreen(
 
     // Hide/show system bars to match chrome visibility
     LaunchedEffect(uiState.showChrome) {
-        val window = (context as android.app.Activity).window
+        val activity = context as? android.app.Activity ?: return@LaunchedEffect
+        val window = activity.window
         val controller = androidx.core.view.WindowCompat.getInsetsController(window, view)
         if (uiState.showChrome) {
             controller.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
@@ -101,9 +102,11 @@ fun ReaderScreen(
         onDispose {
             viewModel.onExitReader()
             // Restore system bars so other screens are not affected
-            val window = (context as android.app.Activity).window
-            val controller = androidx.core.view.WindowCompat.getInsetsController(window, view)
-            controller.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            val activity = context as? android.app.Activity
+            if (activity != null) {
+                val controller = androidx.core.view.WindowCompat.getInsetsController(activity.window, view)
+                controller.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            }
         }
     }
 

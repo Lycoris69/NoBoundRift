@@ -24,6 +24,13 @@ class EmptyChapterCache @Inject constructor(prefs: SharedPreferences) {
     }
 
     @Synchronized
+    fun unmark(mangaId: String) {
+        if (ids.remove(mangaId)) {
+            store.edit().putStringSet(KEY, ids.toSet()).apply()
+        }
+    }
+
+    @Synchronized
     fun getAll(): Set<String> = ids.toSet()
 
     companion object {

@@ -13,6 +13,8 @@ import com.lycoris.noboundrift.presentation.navigation.Screen
 import com.lycoris.noboundrift.presentation.navigation.decodeFromNav
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -120,6 +122,7 @@ class ReaderViewModel @Inject constructor(
         _uiState.update { it.copy(imageRetryKey = it.imageRetryKey + 1) }
     }
 
+    @OptIn(DelicateCoroutinesApi::class)
     fun onExitReader() {
         val state = _uiState.value
         if (state.pages.isEmpty()) return
@@ -135,11 +138,11 @@ class ReaderViewModel @Inject constructor(
         val pageWithinChapter = state.currentPageIndex - activeSegment.startIndex + 1
         val shouldMarkRead = chapterPageCount > 0 && (pageWithinChapter.toFloat() / chapterPageCount) >= 0.8f
 
-        viewModelScope.launch {
-            withContext(NonCancellable) {
-                repository.touchLastOpenedChapter(chapter)
-                if (shouldMarkRead) markChapterRead(chapter)
-            }
+        // viewModelScope is already cancelled when onDispose fires during navigation.
+        // GlobalScope + NonCancellable guarantees these DB writes always complete.
+        GlobalScope.launch(NonCancellable) {
+            repository.touchLastOpenedChapter(chapter)
+            if (shouldMarkRead) markChapterRead(chapter)
         }
     }
 

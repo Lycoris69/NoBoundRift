@@ -171,7 +171,7 @@ private fun BrowseGrid(
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                 )
             }
-            items(uiState.manga, key = { "${it.sourceId}_${it.id}" }) { preview ->
+            items(uiState.manga, key = { "${it.sourceId}_${it.url}" }) { preview ->
                 MangaCard(
                     preview = preview,
                     onClick = { onMangaClick(preview) },

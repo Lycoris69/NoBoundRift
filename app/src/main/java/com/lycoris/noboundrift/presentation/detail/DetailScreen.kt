@@ -150,9 +150,12 @@ private fun MangaDetail(
         lastReadChapterUrl?.let { url -> manga.chapters.find { it.url.trimEnd('/') == url } }
     }
 
-    val displayedChapters = remember(manga.chapters, chaptersReversed, selectedLanguage) {
-        val filtered = if (selectedLanguage.isBlank()) manga.chapters
-                       else manga.chapters.filter { it.language.isEmpty() || it.language == selectedLanguage }
+    val displayedChapters = remember(manga.chapters, chaptersReversed, selectedLanguage, availableLanguages) {
+        val filtered = when {
+            selectedLanguage.isBlank() -> manga.chapters
+            availableLanguages.size > 1 -> manga.chapters.filter { it.language == selectedLanguage }
+            else -> manga.chapters.filter { it.language.isEmpty() || it.language == selectedLanguage }
+        }
         if (chaptersReversed) filtered.reversed() else filtered
     }
 
@@ -265,7 +268,8 @@ private fun MangaDetail(
         // Continue Reading button — only present after at least one chapter has been read
         if (continueChapter != null) {
             item {
-                val label = continueChapter.title.ifBlank { "Chapter ${continueChapter.number}" }
+                val n = continueChapter.number
+                val label = continueChapter.title.ifBlank { "Chapter ${if (n % 1f == 0f) n.toInt() else n}" }
                 Button(
                     onClick = { onChapterClick(continueChapter) },
                     modifier = Modifier.fillMaxWidth(),
@@ -293,7 +297,7 @@ private fun ChapterRow(chapter: Chapter, onClick: () -> Unit) {
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = chapter.title.ifBlank { "Chapter ${chapter.number}" },
+                text = chapter.title.ifBlank { val n = chapter.number; "Chapter ${if (n % 1f == 0f) n.toInt() else n}" },
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (chapter.read) MaterialTheme.colorScheme.onSurfaceVariant
                 else MaterialTheme.colorScheme.onSurface,

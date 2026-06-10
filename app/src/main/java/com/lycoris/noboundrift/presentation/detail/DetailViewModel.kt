@@ -52,6 +52,7 @@ class DetailViewModel @Inject constructor(
     val uiState: StateFlow<DetailUiState> = _uiState.asStateFlow()
 
     private var loadJob: Job? = null
+    private var observersJob: Job? = null
 
     init {
         loadDetail()
@@ -76,13 +77,13 @@ class DetailViewModel @Inject constructor(
         viewModelScope.launch {
             val preview = state.manga.toPreview()
             toggleLibrary(preview, state.isInLibrary)
-            // Optimistically update the UI without waiting for the DB flow
-            _uiState.update { (it as? DetailUiState.Success)?.copy(isInLibrary = !state.isInLibrary) ?: it }
+            // Room Flow collector will update isInLibrary within one write cycle; no optimistic update needed.
         }
     }
 
     private fun loadDetail() {
         loadJob?.cancel()
+        observersJob?.cancel()
         loadJob = viewModelScope.launch {
             _uiState.value = DetailUiState.Loading
             getMangaDetail(sourceId = sourceId, url = mangaUrl)
@@ -105,26 +106,13 @@ class DetailViewModel @Inject constructor(
                     )
 
                     if (chapters.isEmpty()) emptyChapterCache.mark(manga.id)
+                    else emptyChapterCache.unmark(manga.id)
                     val latestAt = chapters.maxOfOrNull { it.dateUpload } ?: 0L
                     if (latestAt > 0L) {
                         launch { repository.updateLatestChapterAt(manga.id, latestAt) }
                     }
-    
-                    // Both observers are children of loadJob — cancelled automatically when loadJob is cancelled
-                    launch {
-                        repository.isInLibrary(manga.id).collect { inLib ->
-                            _uiState.update { state ->
-                                (state as? DetailUiState.Success)?.copy(isInLibrary = inLib) ?: state
-                            }
-                        }
-                    }
-                    launch {
-                        repository.getLastReadChapter(manga.id).collect { url ->
-                            _uiState.update { state ->
-                                (state as? DetailUiState.Success)?.copy(lastReadChapterUrl = url) ?: state
-                            }
-                        }
-                    }
+
+                    startObservers(manga.id)
                 }
                 .onFailure { throwable ->
                     if (throwable is CancellationException) throw throwable
@@ -132,6 +120,26 @@ class DetailViewModel @Inject constructor(
                         throwable.message ?: "Failed to load manga details"
                     )
                 }
+        }
+    }
+
+    private fun startObservers(mangaId: String) {
+        observersJob?.cancel()
+        observersJob = viewModelScope.launch {
+            launch {
+                repository.isInLibrary(mangaId).collect { inLib ->
+                    _uiState.update { state ->
+                        (state as? DetailUiState.Success)?.copy(isInLibrary = inLib) ?: state
+                    }
+                }
+            }
+            launch {
+                repository.getLastReadChapter(mangaId).collect { url ->
+                    _uiState.update { state ->
+                        (state as? DetailUiState.Success)?.copy(lastReadChapterUrl = url) ?: state
+                    }
+                }
+            }
         }
     }
 

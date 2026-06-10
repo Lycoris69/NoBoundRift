@@ -152,6 +152,7 @@ class MangaDexSource @Inject constructor(
             val mangaId = mangaUrl.trimEnd('/').substringAfterLast('/')
             val chapters = mutableListOf<Chapter>()
             val limit = 100
+            val maxChapters = 2000
             var offset = 0
             var total: Int
 
@@ -208,7 +209,7 @@ class MangaDexSource @Inject constructor(
                 }
 
                 offset += data.length()
-            } while (offset < total)
+            } while (offset < total && chapters.size < maxChapters)
 
             chapters.sortedBy { it.number }
         }

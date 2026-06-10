@@ -217,7 +217,7 @@ class BrowseViewModel @Inject constructor(
                         .getOrElse { emptyList() }
                 }
             }
-            val allResults = deferreds.awaitAll().flatten().distinctBy { it.url }
+            val allResults = deferreds.awaitAll().flatten().distinctBy { "${it.sourceId}_${it.url}" }
             _uiState.update {
                 it.copy(
                     manga = allResults,
