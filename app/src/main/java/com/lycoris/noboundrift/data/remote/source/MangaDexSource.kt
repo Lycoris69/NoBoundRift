@@ -48,7 +48,8 @@ class MangaDexSource @Inject constructor(
         val url = "$apiBase/manga?order[updatedAt]=desc&limit=20&offset=$offset" +
             "&includes[]=cover_art" +
             "&contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica" +
-            "&hasAvailableChapters=1"
+            "&hasAvailableChapters=1" +
+            "&availableTranslatedLanguage[]=en"
         return parseMangaPreviews(getJson(url).getJSONArray("data"))
     }
 
@@ -84,6 +85,11 @@ class MangaDexSource @Inject constructor(
             0L
         }
 
+        val availableLangs = attrs.optJSONArray("availableTranslatedLanguages")
+        val hasEnglish = availableLangs != null &&
+            (0 until availableLangs.length()).any { availableLangs.optString(it) == "en" }
+        val chapterCount = if (availableLangs != null && !hasEnglish) 0 else -1
+
         return MangaPreview(
             id = uuid,
             title = title,
@@ -91,6 +97,7 @@ class MangaDexSource @Inject constructor(
             sourceId = id,
             url = "$baseUrl/title/$uuid",
             latestChapterAt = latestChapterAt,
+            chapterCount = chapterCount,
         )
     }
 

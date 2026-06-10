@@ -7,4 +7,6 @@ data class MangaPreview(
     val sourceId: Long,
     val url: String,
     val latestChapterAt: Long = 0L,
+    // -1 = unknown, 0 = confirmed no readable chapters
+    val chapterCount: Int = -1,
 )
