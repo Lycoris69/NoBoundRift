@@ -47,7 +47,8 @@ class MangaDexSource @Inject constructor(
         val offset = (page - 1) * 20
         val url = "$apiBase/manga?order[updatedAt]=desc&limit=20&offset=$offset" +
             "&includes[]=cover_art" +
-            "&contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica"
+            "&contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica" +
+            "&hasAvailableChapters=1"
         return parseMangaPreviews(getJson(url).getJSONArray("data"))
     }
 
@@ -172,10 +173,10 @@ class MangaDexSource @Inject constructor(
                     if (!attrs.isNull("externalUrl") && attrs.optString("externalUrl").isNotBlank()) continue
                     if (attrs.optInt("pages", 0) == 0) continue
 
-                    val chapterStr = attrs.optString("chapter", "")
+                    val chapterStr = attrs.optString("chapter", "").takeIf { it != "null" } ?: ""
                     val number = chapterStr.toFloatOrNull() ?: (chapters.size + offset).toFloat()
 
-                    val rawTitle = attrs.optString("title", "")
+                    val rawTitle = attrs.optString("title", "").takeIf { it != "null" } ?: ""
                     val title = if (rawTitle.isNotBlank()) {
                         rawTitle
                     } else {
