@@ -3,6 +3,7 @@ package com.lycoris.noboundrift.presentation.detail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lycoris.noboundrift.data.local.EmptyChapterCache
 import com.lycoris.noboundrift.domain.model.Manga
 import com.lycoris.noboundrift.domain.model.MangaPreview
 import com.lycoris.noboundrift.domain.usecase.GetMangaDetailUseCase
@@ -40,6 +41,7 @@ class DetailViewModel @Inject constructor(
     private val getMangaDetail: GetMangaDetailUseCase,
     private val toggleLibrary: ToggleLibraryUseCase,
     private val repository: MangaRepository,
+    private val emptyChapterCache: EmptyChapterCache,
 ) : ViewModel() {
 
     private val sourceId: Long = checkNotNull(savedStateHandle[Screen.Detail.ARG_SOURCE_ID])
@@ -102,11 +104,10 @@ class DetailViewModel @Inject constructor(
                         selectedLanguage = defaultLang,
                     )
 
+                    if (chapters.isEmpty()) emptyChapterCache.mark(manga.id)
                     val latestAt = chapters.maxOfOrNull { it.dateUpload } ?: 0L
-                    when {
-                        // -1L signals browse enrichment to show "0 ch" badge on the card
-                        chapters.isEmpty() -> launch { repository.updateLatestChapterAt(manga.id, -1L) }
-                        latestAt > 0L -> launch { repository.updateLatestChapterAt(manga.id, latestAt) }
+                    if (latestAt > 0L) {
+                        launch { repository.updateLatestChapterAt(manga.id, latestAt) }
                     }
     
                     // Both observers are children of loadJob — cancelled automatically when loadJob is cancelled

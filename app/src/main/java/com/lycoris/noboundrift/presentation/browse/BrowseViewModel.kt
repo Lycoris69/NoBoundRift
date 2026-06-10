@@ -2,6 +2,7 @@ package com.lycoris.noboundrift.presentation.browse
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lycoris.noboundrift.data.local.EmptyChapterCache
 import com.lycoris.noboundrift.data.local.SourcePreferences
 import com.lycoris.noboundrift.data.remote.source.SourceManager
 import com.lycoris.noboundrift.domain.model.MangaPreview
@@ -37,6 +38,7 @@ class BrowseViewModel @Inject constructor(
     private val getMangaList: GetMangaListUseCase,
     private val repository: MangaRepository,
     private val sourceManager: SourceManager,
+    private val emptyChapterCache: EmptyChapterCache,
 ) : ViewModel() {
 
     val allSourceNames: Map<Long, String> = sourceManager.getAllSources().associate { it.id to it.name }
@@ -130,15 +132,14 @@ class BrowseViewModel @Inject constructor(
             runCatching { repository.getLatestChapterDates(currentIds) }
                 .onSuccess { dateMap ->
                     if (dateMap.isEmpty()) return@onSuccess
+                    val emptyIds = emptyChapterCache.getAll()
                     _uiState.update { state ->
                         state.copy(
                             manga = state.manga.map { preview ->
-                                val stored = dateMap[preview.id]
+                                val stored = dateMap[preview.id] ?: 0L
                                 when {
-                                    // -1L = DetailViewModel confirmed 0 readable chapters for this manga
-                                    stored == -1L -> preview.copy(chapterCount = 0)
-                                    stored != null && stored > preview.latestChapterAt ->
-                                        preview.copy(latestChapterAt = stored)
+                                    preview.id in emptyIds -> preview.copy(chapterCount = 0)
+                                    stored > preview.latestChapterAt -> preview.copy(latestChapterAt = stored)
                                     else -> preview
                                 }
                             }

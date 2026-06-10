@@ -45,7 +45,7 @@ class MangaDexSource @Inject constructor(
 
     private fun fetchBrowseResults(page: Int): List<MangaPreview> {
         val offset = (page - 1) * 20
-        val url = "$apiBase/manga?order[updatedAt]=desc&limit=20&offset=$offset" +
+        val url = "$apiBase/manga?order[latestUploadedChapter]=desc&limit=20&offset=$offset" +
             "&includes[]=cover_art" +
             "&contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica" +
             "&hasAvailableChapters=1" +
