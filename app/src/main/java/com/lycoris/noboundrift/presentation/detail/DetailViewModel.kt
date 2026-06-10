@@ -103,8 +103,10 @@ class DetailViewModel @Inject constructor(
                     )
 
                     val latestAt = chapters.maxOfOrNull { it.dateUpload } ?: 0L
-                    if (latestAt > 0L) {
-                        launch { repository.updateLatestChapterAt(manga.id, latestAt) }
+                    when {
+                        // -1L signals browse enrichment to show "0 ch" badge on the card
+                        chapters.isEmpty() -> launch { repository.updateLatestChapterAt(manga.id, -1L) }
+                        latestAt > 0L -> launch { repository.updateLatestChapterAt(manga.id, latestAt) }
                     }
     
                     // Both observers are children of loadJob — cancelled automatically when loadJob is cancelled

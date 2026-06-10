@@ -133,12 +133,14 @@ class BrowseViewModel @Inject constructor(
                     _uiState.update { state ->
                         state.copy(
                             manga = state.manga.map { preview ->
-                                val stored = dateMap[preview.id] ?: 0L
-                                // Prefer whichever timestamp is more recent: the scrape-provided
-                                // value (if the source parsed it from the card HTML) or the stored
-                                // Room value (written by DetailViewModel after a chapter-list fetch).
-                                if (stored > preview.latestChapterAt) preview.copy(latestChapterAt = stored)
-                                else preview
+                                val stored = dateMap[preview.id]
+                                when {
+                                    // -1L = DetailViewModel confirmed 0 readable chapters for this manga
+                                    stored == -1L -> preview.copy(chapterCount = 0)
+                                    stored != null && stored > preview.latestChapterAt ->
+                                        preview.copy(latestChapterAt = stored)
+                                    else -> preview
+                                }
                             }
                         )
                     }

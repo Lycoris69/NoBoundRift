@@ -85,11 +85,6 @@ class MangaDexSource @Inject constructor(
             0L
         }
 
-        val availableLangs = attrs.optJSONArray("availableTranslatedLanguages")
-        val hasEnglish = availableLangs != null &&
-            (0 until availableLangs.length()).any { availableLangs.optString(it) == "en" }
-        val chapterCount = if (availableLangs != null && !hasEnglish) 0 else -1
-
         return MangaPreview(
             id = uuid,
             title = title,
@@ -97,7 +92,6 @@ class MangaDexSource @Inject constructor(
             sourceId = id,
             url = "$baseUrl/title/$uuid",
             latestChapterAt = latestChapterAt,
-            chapterCount = chapterCount,
         )
     }
 
