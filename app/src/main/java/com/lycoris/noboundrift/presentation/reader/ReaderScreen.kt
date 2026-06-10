@@ -317,6 +317,9 @@ private fun PageImage(page: Page, imageRetryKey: Int, modifier: Modifier = Modif
             // doesn't get served again (memory cache key alone is insufficient).
             .diskCacheKey("${page.imageUrl}:$imageRetryKey")
             .size(CoilSize(Dimension.Pixels(screenWidthPx), Dimension.Pixels(maxHeightPx)))
+            // Disable hardware bitmaps: hardware allocation silently returns null on some
+            // devices when GPU memory is tight, causing the BitmapFactory null error.
+            .allowHardware(false)
             .apply {
                 page.refererUrl?.let { addHeader("Referer", it) }
             }
