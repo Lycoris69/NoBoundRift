@@ -24,6 +24,14 @@ class NoBoundRiftApp : Application(), ImageLoaderFactory {
         val dispatcher = Dispatcher().apply { maxRequestsPerHost = 2 }
         val coilClient = okHttpClient.newBuilder()
             .dispatcher(dispatcher)
+            // Image requests need a browser-like Accept header; some CDNs reject without it.
+            .addInterceptor { chain ->
+                chain.proceed(
+                    chain.request().newBuilder()
+                        .header("Accept", "image/avif,image/webp,image/apng,image/*,*/*;q=0.8")
+                        .build()
+                )
+            }
             .build()
 
         return ImageLoader.Builder(this)

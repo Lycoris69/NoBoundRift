@@ -50,15 +50,20 @@ import kotlinx.coroutines.flow.map
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImagePainter
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
+import coil.size.Dimension
+import coil.size.Size as CoilSize
 import com.lycoris.noboundrift.domain.model.Page
 
 /**
@@ -293,17 +298,25 @@ private fun PageFlipReader(
 @Composable
 private fun PageImage(page: Page, imageRetryKey: Int, modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val density = LocalDensity.current
+    val configuration = LocalConfiguration.current
 
-    val model = remember(page.imageUrl, imageRetryKey) {
+    // Decode at exactly screen width. For images narrower than the screen (e.g. 800 px webtoon
+    // strips on a 1080 px display) inSampleSize stays 1 — no width reduction, no blur.
+    // The height cap prevents OOM on extremely tall single-strip chapters (16 000+ px).
+    // Choosing 8× screen width as the cap: for a typical 800×16 000 strip on a 1080 px device
+    // the cap is 8 640 px, keeping heightRatio < 2 → inSampleSize=1 → no blur.
+    val screenWidthPx = with(density) { configuration.screenWidthDp.dp.roundToPx() }
+    val maxHeightPx = (screenWidthPx * 8).coerceAtMost(16384)
+
+    val model = remember(page.imageUrl, imageRetryKey, screenWidthPx) {
         ImageRequest.Builder(context)
             .data(page.imageUrl)
             .memoryCacheKey("${page.imageUrl}:$imageRetryKey")
             // Also bust the disk cache on retry so a previously bad/partial download
             // doesn't get served again (memory cache key alone is insufficient).
             .diskCacheKey("${page.imageUrl}:$imageRetryKey")
-            // No explicit .size() — SubcomposeAsyncImage provides its own layout width
-            // (screen width) to Coil. Coil picks inSampleSize based on width alone, so
-            // the decoded bitmap is always sharp enough to fill the screen without stretching.
+            .size(CoilSize(Dimension.Pixels(screenWidthPx), Dimension.Pixels(maxHeightPx)))
             .apply {
                 page.refererUrl?.let { addHeader("Referer", it) }
             }
@@ -325,6 +338,14 @@ private fun PageImage(page: Page, imageRetryKey: Int, modifier: Modifier = Modif
             }
         },
         error = {
+            val errState = painter.state
+            if (errState is AsyncImagePainter.State.Error) {
+                android.util.Log.e(
+                    "PageImage",
+                    "Page ${page.index + 1} failed [${page.imageUrl}]",
+                    errState.result.throwable,
+                )
+            }
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
