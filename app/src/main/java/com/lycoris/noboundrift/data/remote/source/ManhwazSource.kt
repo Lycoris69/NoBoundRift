@@ -203,6 +203,8 @@ class ManhwazSource @Inject constructor(
             doc.select("div.reading-content img")
                 .mapIndexedNotNull { index, img ->
                     val rawUrl = img.attr("data-src").takeIf { it.isNotBlank() }
+                        ?: img.attr("data-lazy-src").takeIf { it.isNotBlank() }
+                        ?: img.attr("data-original").takeIf { it.isNotBlank() }
                         ?: img.attr("src").takeIf { it.isNotBlank() }
                         ?: return@mapIndexedNotNull null
 
