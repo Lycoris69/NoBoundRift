@@ -338,13 +338,16 @@ private fun PageImage(page: Page, imageRetryKey: Int, modifier: Modifier = Modif
             }
         },
         error = {
-            val errState = painter.state
-            if (errState is AsyncImagePainter.State.Error) {
-                android.util.Log.e(
-                    "PageImage",
-                    "Page ${page.index + 1} failed [${page.imageUrl}]",
-                    errState.result.throwable,
-                )
+            val errState = painter.state as? AsyncImagePainter.State.Error
+            val throwable = errState?.result?.throwable
+            android.util.Log.e("PageImage", "Page ${page.index + 1} [${page.imageUrl}]", throwable)
+            val errLabel = when (throwable) {
+                is java.net.UnknownHostException -> "DNS failure"
+                is java.net.SocketTimeoutException -> "Timeout"
+                is java.io.IOException -> throwable.message?.take(80) ?: "Network error"
+                is OutOfMemoryError -> "OOM"
+                null -> "Unknown"
+                else -> "${throwable.javaClass.simpleName}: ${throwable.message?.take(60)}"
             }
             Box(
                 modifier = Modifier
@@ -352,7 +355,15 @@ private fun PageImage(page: Page, imageRetryKey: Int, modifier: Modifier = Modif
                     .fillMaxHeight(0.3f),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("Failed to load page ${page.index + 1}", color = Color.White)
+                androidx.compose.foundation.layout.Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                ) {
+                    Text("Failed to load page ${page.index + 1}", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                    Text(errLabel, color = Color.Red, style = MaterialTheme.typography.labelSmall)
+                    Text(page.imageUrl.take(80), color = Color.Gray, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center)
+                }
             }
         },
     )
