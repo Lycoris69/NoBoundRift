@@ -2,7 +2,6 @@ package com.lycoris.noboundrift.data.repository
 
 import com.lycoris.noboundrift.data.local.dao.ChapterDao
 import com.lycoris.noboundrift.data.local.dao.MangaDao
-import com.lycoris.noboundrift.data.local.entity.ChapterEntity
 import com.lycoris.noboundrift.data.local.entity.MangaEntity
 import com.lycoris.noboundrift.data.remote.source.SourceManager
 import com.lycoris.noboundrift.domain.model.Chapter
@@ -100,16 +99,13 @@ class MangaRepositoryImpl @Inject constructor(
     // ── Reading progress ──────────────────────────────────────────────────────
 
     override suspend fun markChapterRead(chapter: Chapter) {
-        chapterDao.insertOrReplace(
-            ChapterEntity(
-                chapterUrl = chapter.url.trimEnd('/'),
-                mangaId = chapter.mangaId,
-                title = chapter.title,
-                number = chapter.number,
-                read = true,
-                dateUpload = chapter.dateUpload,
-                lastReadAt = System.currentTimeMillis(),
-            )
+        chapterDao.markReadUpsert(
+            chapterUrl = chapter.url.trimEnd('/'),
+            mangaId = chapter.mangaId,
+            title = chapter.title,
+            number = chapter.number,
+            dateUpload = chapter.dateUpload,
+            timestamp = System.currentTimeMillis(),
         )
     }
 

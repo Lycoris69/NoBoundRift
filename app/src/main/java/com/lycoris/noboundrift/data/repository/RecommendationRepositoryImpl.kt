@@ -11,6 +11,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -30,9 +32,14 @@ class RecommendationRepositoryImpl @Inject constructor(
 
                 val libraryTitlesLower = libraryEntries.map { it.title.lowercase() }.toSet()
 
+                val semaphore = Semaphore(3)
                 val results = coroutineScope {
                     libraryEntries.map { entry ->
-                        async { aniListApi.searchWithRecommendations(entry.title) }
+                        async {
+                            semaphore.withPermit {
+                                aniListApi.searchWithRecommendations(entry.title)
+                            }
+                        }
                     }.awaitAll()
                 }
 

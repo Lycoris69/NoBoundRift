@@ -166,8 +166,9 @@ class MangaDexSource @Inject constructor(
                 val json = getJson(url)
                 total = json.getInt("total")
                 val data = json.getJSONArray("data")
+                val pageCount = data.length()
 
-                for (i in 0 until data.length()) {
+                for (i in 0 until pageCount) {
                     val obj = data.getJSONObject(i)
                     val chapterId = obj.getString("id")
                     val attrs = obj.getJSONObject("attributes")
@@ -208,7 +209,8 @@ class MangaDexSource @Inject constructor(
                     )
                 }
 
-                offset += data.length()
+                offset += pageCount
+                if (pageCount == 0) break
             } while (offset < total && chapters.size < maxChapters)
 
             chapters.sortedBy { it.number }

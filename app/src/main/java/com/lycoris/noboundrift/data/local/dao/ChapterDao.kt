@@ -57,6 +57,20 @@ interface ChapterDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrReplace(entity: ChapterEntity)
 
+    @Query("""
+        INSERT INTO chapter_progress (chapterUrl, mangaId, title, number, read, dateUpload, lastReadAt)
+        VALUES (:chapterUrl, :mangaId, :title, :number, 1, :dateUpload, :timestamp)
+        ON CONFLICT(chapterUrl) DO UPDATE SET read = 1, lastReadAt = :timestamp
+    """)
+    suspend fun markReadUpsert(
+        chapterUrl: String,
+        mangaId: String,
+        title: String,
+        number: Float,
+        dateUpload: Long,
+        timestamp: Long,
+    )
+
     @Query("UPDATE chapter_progress SET read = 1, lastReadAt = :timestamp WHERE chapterUrl = :url")
     suspend fun markRead(url: String, timestamp: Long = System.currentTimeMillis())
 
