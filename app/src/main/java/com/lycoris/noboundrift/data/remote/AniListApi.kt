@@ -96,7 +96,8 @@ class AniListApi @Inject constructor(private val okHttpClient: OkHttpClient) {
                 for (i in 0 until recNodes.length()) {
                     val rec = recNodes.getJSONObject(i).optJSONObject("mediaRecommendation")
                         ?: continue
-                    entries += parseEntry(rec)
+                    val entry = parseEntry(rec)
+                    if (entry.genres.none { it.equals("Hentai", ignoreCase = true) }) entries += entry
                 }
 
                 val relEdges = media
@@ -108,7 +109,8 @@ class AniListApi @Inject constructor(private val okHttpClient: OkHttpClient) {
                     if (relationType !in relatedTypes) continue
                     val node = edge.optJSONObject("node") ?: continue
                     if (node.optString("type") != "MANGA") continue
-                    entries += parseEntry(node)
+                    val entry = parseEntry(node)
+                    if (entry.genres.none { it.equals("Hentai", ignoreCase = true) }) entries += entry
                 }
 
                 AniListResult(

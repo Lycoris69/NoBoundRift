@@ -56,7 +56,8 @@ class RecommendationRepositoryImpl @Inject constructor(
                     .filter { (entry, _) ->
                         val titleLower = entry.title.lowercase()
                         entry.aniListId !in matchedIds &&
-                            libraryTitlesLower.none { it.contains(titleLower) || titleLower.contains(it) }
+                            libraryTitlesLower.none { it.contains(titleLower) || titleLower.contains(it) } &&
+                            entry.genres.none { it.equals("Hentai", ignoreCase = true) }
                     }
                     .sortedByDescending { (_, score) -> score }
                     .take(30)
