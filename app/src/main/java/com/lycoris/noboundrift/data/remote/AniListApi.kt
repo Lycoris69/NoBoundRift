@@ -130,8 +130,9 @@ class AniListApi @Inject constructor(private val okHttpClient: OkHttpClient) {
         }
 
     private fun resolveTitle(titleObj: JSONObject): String {
-        val english = titleObj.optString("english")
-        return if (!english.isNullOrBlank()) english else titleObj.optString("romaji", "")
+        val english = titleObj.optString("english").takeIf { it.isNotBlank() && it != "null" }
+        val romaji = titleObj.optString("romaji").takeIf { it.isNotBlank() && it != "null" }
+        return english ?: romaji ?: ""
     }
 
     private fun parseEntry(obj: JSONObject): RecommendedEntry {
