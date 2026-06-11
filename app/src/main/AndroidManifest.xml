@@ -3,6 +3,8 @@
 
     <!-- Required for scraping source websites -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Required to check Wi-Fi vs. mobile data for preload gating -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:name=".NoBoundRiftApp"
