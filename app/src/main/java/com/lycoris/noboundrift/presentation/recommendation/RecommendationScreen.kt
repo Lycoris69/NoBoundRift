@@ -43,7 +43,7 @@ import com.lycoris.noboundrift.domain.model.RecommendedManga
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecommendationScreen(
-    onMangaClick: (title: String) -> Unit,
+    onMangaClick: (title: String, altTitles: List<String>) -> Unit,
     viewModel: RecommendationViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -90,7 +90,7 @@ fun RecommendationScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         items(uiState.items) { item ->
-                            RecommendationCard(item = item, onClick = { onMangaClick(item.title) })
+                            RecommendationCard(item = item, onClick = { onMangaClick(item.title, item.alternativeTitles) })
                         }
                     }
                 }

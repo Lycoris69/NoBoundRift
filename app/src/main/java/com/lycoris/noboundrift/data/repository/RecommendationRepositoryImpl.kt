@@ -68,6 +68,7 @@ class RecommendationRepositoryImpl @Inject constructor(
                             coverUrl = entry.coverUrl,
                             genres = entry.genres,
                             score = score,
+                            alternativeTitles = entry.synonyms,
                         )
                     }
             }.onFailure { t ->

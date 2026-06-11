@@ -12,9 +12,14 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -47,10 +52,17 @@ fun BrowseScreen(
     val allSourceNames = viewModel.allSourceNames
 
     Column(modifier = Modifier.fillMaxSize()) {
-        SearchBar(
-            query = uiState.searchQuery,
-            onQueryChange = viewModel::onSearchQueryChange,
-        )
+        if (uiState.isDiscoverMode) {
+            DiscoverModeHeader(
+                title = uiState.searchQuery,
+                onExit = viewModel::exitDiscoverMode,
+            )
+        } else {
+            SearchBar(
+                query = uiState.searchQuery,
+                onQueryChange = viewModel::onSearchQueryChange,
+            )
+        }
 
         when {
             uiState.isLoading -> {
@@ -74,6 +86,33 @@ fun BrowseScreen(
                     allSourceNames = allSourceNames,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun DiscoverModeHeader(title: String, onExit: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Default.AutoAwesome,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        IconButton(onClick = onExit) {
+            Icon(Icons.Default.Close, contentDescription = "Exit Discover")
         }
     }
 }
@@ -161,15 +200,17 @@ private fun BrowseGrid(
         modifier = Modifier.fillMaxSize(),
     ) {
         if (isCrossSourceSearch) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Text(
-                    text = "No results on this source — showing results from other sources",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                )
+            if (!uiState.isDiscoverMode) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        text = "No results on this source — showing results from other sources",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                    )
+                }
             }
             items(uiState.manga, key = { "${it.sourceId}_${it.url}" }) { preview ->
                 MangaCard(

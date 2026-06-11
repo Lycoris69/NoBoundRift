@@ -31,6 +31,7 @@ data class BrowseUiState(
     val canLoadMore: Boolean = true,
     val searchQuery: String = "",
     val isCrossSourceSearch: Boolean = false,
+    val isDiscoverMode: Boolean = false,
 )
 
 @HiltViewModel
@@ -47,8 +48,17 @@ class BrowseViewModel @Inject constructor(
 
     private var sourceId: Long = 0L
 
+    private val initialQuery = savedStateHandle.get<String>("query") ?: ""
+    private val altTitles: List<String> = savedStateHandle.get<String>("altTitles")
+        ?.split("|")
+        ?.filter { it.isNotBlank() }
+        ?: emptyList()
+
     private val _uiState = MutableStateFlow(
-        BrowseUiState(searchQuery = savedStateHandle.get<String>("query") ?: "")
+        BrowseUiState(
+            searchQuery = initialQuery,
+            isDiscoverMode = altTitles.isNotEmpty(),
+        )
     )
     val uiState: StateFlow<BrowseUiState> = _uiState.asStateFlow()
 
@@ -59,7 +69,12 @@ class BrowseViewModel @Inject constructor(
                 if (!initialized) {
                     initialized = true
                     sourceId = newSourceId
-                    loadPage(page = 1)
+                    if (altTitles.isNotEmpty()) {
+                        val allTitles = (listOf(initialQuery) + altTitles).filter { it.isNotBlank() }.distinct()
+                        launchMultiTitleSearch(allTitles)
+                    } else {
+                        loadPage(page = 1)
+                    }
                 } else if (newSourceId != sourceId) {
                     sourceId = newSourceId
                     searchJob?.cancel()
@@ -231,5 +246,44 @@ class BrowseViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    private fun launchMultiTitleSearch(titles: List<String>) {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null, isCrossSourceSearch = true) }
+            val allSources = sourceManager.getAllSources()
+            val deferreds = allSources.flatMap { source ->
+                titles.map { title ->
+                    async {
+                        runCatching {
+                            getMangaList(sourceId = source.id, page = 1, query = title)
+                                .getOrElse { emptyList() }
+                        }
+                            .onFailure { if (it is CancellationException) throw it }
+                            .getOrElse { emptyList() }
+                    }
+                }
+            }
+            val allResults = deferreds.awaitAll()
+                .flatten()
+                .distinctBy { "${it.sourceId}_${it.url}" }
+            _uiState.update {
+                it.copy(
+                    manga = allResults,
+                    isLoading = false,
+                    isCrossSourceSearch = true,
+                    canLoadMore = false,
+                )
+            }
+        }
+    }
+
+    fun exitDiscoverMode() {
+        loadJob?.cancel()
+        searchJob?.cancel()
+        crossSourceJob?.cancel()
+        _uiState.update { BrowseUiState(searchQuery = "", isDiscoverMode = false) }
+        loadPage(page = 1)
     }
 }

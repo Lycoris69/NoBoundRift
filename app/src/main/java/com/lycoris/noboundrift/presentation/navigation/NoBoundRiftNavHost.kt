@@ -120,6 +120,10 @@ fun NoBoundRiftNavHost() {
                         type = NavType.StringType
                         defaultValue = ""
                     },
+                    navArgument(Screen.Browse.ARG_ALT_TITLES) {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
                 ),
             ) {
                 BrowseScreen(
@@ -162,8 +166,8 @@ fun NoBoundRiftNavHost() {
 
             composable(Screen.Recommendation.route) {
                 RecommendationScreen(
-                    onMangaClick = { title ->
-                        navController.navigate(Screen.Browse.createRoute(title)) {
+                    onMangaClick = { title, altTitles ->
+                        navController.navigate(Screen.Browse.createRoute(title, altTitles)) {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = false }
                             launchSingleTop = false
                         }

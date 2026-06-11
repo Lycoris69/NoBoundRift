@@ -4,10 +4,11 @@ sealed class Screen(val route: String) {
 
     data object Library : Screen("library")
 
-    data object Browse : Screen("browse?query={query}") {
+    data object Browse : Screen("browse?query={query}&altTitles={altTitles}") {
         const val ARG_QUERY = "query"
-        fun createRoute(query: String = "") =
-            if (query.isBlank()) "browse" else "browse?query=${query.encodeForNav()}"
+        const val ARG_ALT_TITLES = "altTitles"
+        fun createRoute(query: String = "", altTitles: List<String> = emptyList()): String =
+            "browse?query=${query.encodeForNav()}&altTitles=${altTitles.joinToString("|").encodeForNav()}"
     }
 
     data object Detail : Screen("detail/{sourceId}/{url}") {

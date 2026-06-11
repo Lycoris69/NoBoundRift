@@ -21,6 +21,7 @@ data class RecommendedEntry(
     val title: String,
     val coverUrl: String,
     val genres: List<String>,
+    val synonyms: List<String>,
 )
 
 @Singleton
@@ -41,6 +42,7 @@ class AniListApi @Inject constructor(private val okHttpClient: OkHttpClient) {
                   title { romaji english }
                   coverImage { large }
                   genres
+                  synonyms
                 }
               }
             }
@@ -53,12 +55,18 @@ class AniListApi @Inject constructor(private val okHttpClient: OkHttpClient) {
                   title { romaji english }
                   coverImage { large }
                   genres
+                  synonyms
                 }
               }
             }
           }
         }
     """.trimIndent()
+
+    private fun isLatinScript(s: String) = s.none { c ->
+        val cp = c.code
+        (cp in 0x3040..0x30FF) || (cp in 0x4E00..0x9FFF) || (cp in 0xAC00..0xD7AF)
+    }
 
     private val relatedTypes = setOf(
         "ADAPTATION", "SIDE_STORY", "SPIN_OFF", "ALTERNATIVE", "SEQUEL", "PREQUEL"
@@ -136,6 +144,15 @@ class AniListApi @Inject constructor(private val okHttpClient: OkHttpClient) {
                 for (i in 0 until genresArray.length()) add(genresArray.getString(i))
             }
         }
-        return RecommendedEntry(aniListId = id, title = title, coverUrl = coverUrl, genres = genres)
+        val synonymsArray = obj.optJSONArray("synonyms")
+        val synonyms = buildList {
+            if (synonymsArray != null) {
+                for (i in 0 until synonymsArray.length()) {
+                    val s = synonymsArray.getString(i)
+                    if (s != title && isLatinScript(s)) add(s)
+                }
+            }
+        }.take(3)
+        return RecommendedEntry(aniListId = id, title = title, coverUrl = coverUrl, genres = genres, synonyms = synonyms)
     }
 }

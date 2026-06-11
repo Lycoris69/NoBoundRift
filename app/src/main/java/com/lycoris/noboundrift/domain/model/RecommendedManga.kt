@@ -6,4 +6,5 @@ data class RecommendedManga(
     val coverUrl: String,
     val genres: List<String>,
     val score: Int,
+    val alternativeTitles: List<String>,
 )
