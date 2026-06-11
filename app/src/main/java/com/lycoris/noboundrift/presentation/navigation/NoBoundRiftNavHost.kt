@@ -2,6 +2,7 @@ package com.lycoris.noboundrift.presentation.navigation
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Settings
@@ -22,6 +23,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.lycoris.noboundrift.presentation.browse.BrowseScreen
+import com.lycoris.noboundrift.presentation.recommendation.RecommendationScreen
 import com.lycoris.noboundrift.presentation.detail.DetailScreen
 import com.lycoris.noboundrift.presentation.library.LibraryScreen
 import com.lycoris.noboundrift.presentation.reader.ReaderScreen
@@ -51,6 +53,11 @@ fun NoBoundRiftNavHost() {
             icon = { Icon(Icons.Default.Explore, contentDescription = "Browse") },
         ),
         BottomNavItem(
+            screen = Screen.Recommendation,
+            label = "Discover",
+            icon = { Icon(Icons.Default.AutoAwesome, contentDescription = "Discover") },
+        ),
+        BottomNavItem(
             screen = Screen.Settings,
             label = "Settings",
             icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
@@ -60,6 +67,7 @@ fun NoBoundRiftNavHost() {
     val showBottomBar = currentDestination?.hierarchy?.any { dest ->
         dest.route == Screen.Library.route ||
             dest.route == Screen.Browse.route ||
+            dest.route == Screen.Recommendation.route ||
             dest.route == Screen.Settings.route
     } == true
 
@@ -141,6 +149,18 @@ fun NoBoundRiftNavHost() {
                 ),
             ) {
                 ReaderScreen(onBackClick = { navController.popBackStack() })
+            }
+
+            composable(Screen.Recommendation.route) {
+                RecommendationScreen(
+                    onMangaClick = { title ->
+                        navController.navigate(Screen.Browse.route) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                )
             }
 
             composable(Screen.Settings.route) {

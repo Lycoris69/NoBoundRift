@@ -22,6 +22,8 @@ sealed class Screen(val route: String) {
             "reader/$sourceId/${mangaId.encodeForNav()}/${chapterUrl.encodeForNav()}/${mangaTitle.encodeForNav()}"
     }
 
+    data object Recommendation : Screen("recommendation")
+
     data object Settings : Screen("settings")
 }
 
