@@ -2,6 +2,8 @@ package com.lycoris.noboundrift.presentation.settings
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -42,7 +44,7 @@ fun SettingsScreen(
             TopAppBar(title = { Text("Settings") })
         },
     ) { innerPadding ->
-        Column(modifier = Modifier.padding(innerPadding)) {
+        Column(modifier = Modifier.padding(innerPadding).verticalScroll(rememberScrollState())) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "Browse Source",
