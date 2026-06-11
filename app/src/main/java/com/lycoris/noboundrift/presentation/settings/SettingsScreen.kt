@@ -22,6 +22,13 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
+private val CACHE_SIZE_OPTIONS = listOf(
+    64L * 1024 * 1024 to "64 MB",
+    128L * 1024 * 1024 to "128 MB (default)",
+    256L * 1024 * 1024 to "256 MB",
+    512L * 1024 * 1024 to "512 MB",
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -48,6 +55,27 @@ fun SettingsScreen(
                     url = source.baseUrl,
                     selected = source.id == uiState.selectedSourceId,
                     onClick = { viewModel.selectSource(source.id) },
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Cache Size",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+            Text(
+                text = "Takes effect after restarting the app.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+            )
+            CACHE_SIZE_OPTIONS.forEach { (bytes, label) ->
+                CacheSizeRow(
+                    label = label,
+                    selected = uiState.cacheSizeBytes == bytes,
+                    onClick = { viewModel.setCacheSize(bytes) },
                 )
             }
         }
@@ -84,5 +112,30 @@ private fun SourceRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+@Composable
+private fun CacheSizeRow(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = onClick,
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+        )
     }
 }

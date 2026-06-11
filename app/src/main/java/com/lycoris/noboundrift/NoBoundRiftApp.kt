@@ -5,6 +5,7 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import com.lycoris.noboundrift.data.local.CachePreferences
 import dagger.hilt.android.HiltAndroidApp
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
@@ -16,6 +17,7 @@ class NoBoundRiftApp : Application(), ImageLoaderFactory {
     // Field-injected by Hilt after Application.onCreate so the singleton client
     // is shared between all scrapers and Coil (one connection pool, shared cookies).
     @Inject lateinit var okHttpClient: OkHttpClient
+    @Inject lateinit var cachePreferences: CachePreferences
 
     override fun newImageLoader(): ImageLoader {
         // Derive a Coil-specific client from the shared singleton: keep all interceptors,
@@ -31,7 +33,7 @@ class NoBoundRiftApp : Application(), ImageLoaderFactory {
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache"))
-                    .maxSizePercent(0.05) // 5 % of free disk space
+                    .maxSizeBytes(cachePreferences.getCacheSizeBytes())
                     .build()
             }
             .memoryCache {
