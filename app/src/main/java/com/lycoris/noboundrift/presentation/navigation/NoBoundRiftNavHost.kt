@@ -81,7 +81,8 @@ fun NoBoundRiftNavHost() {
                                 it.route == item.screen.route
                             } == true,
                             onClick = {
-                                navController.navigate(item.screen.route) {
+                                val route = if (item.screen == Screen.Browse) Screen.Browse.createRoute() else item.screen.route
+                                navController.navigate(route) {
                                     popUpTo(navController.graph.findStartDestination().id) {
                                         saveState = true
                                     }
@@ -112,7 +113,15 @@ fun NoBoundRiftNavHost() {
                 )
             }
 
-            composable(Screen.Browse.route) {
+            composable(
+                route = Screen.Browse.route,
+                arguments = listOf(
+                    navArgument(Screen.Browse.ARG_QUERY) {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                ),
+            ) {
                 BrowseScreen(
                     onMangaClick = { preview ->
                         navController.navigate(
@@ -154,10 +163,9 @@ fun NoBoundRiftNavHost() {
             composable(Screen.Recommendation.route) {
                 RecommendationScreen(
                     onMangaClick = { title ->
-                        navController.navigate(Screen.Browse.route) {
-                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
+                        navController.navigate(Screen.Browse.createRoute(title)) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = false }
+                            launchSingleTop = false
                         }
                     },
                 )

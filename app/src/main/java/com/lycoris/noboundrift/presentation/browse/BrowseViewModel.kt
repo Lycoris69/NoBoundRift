@@ -1,5 +1,6 @@
 package com.lycoris.noboundrift.presentation.browse
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lycoris.noboundrift.data.local.EmptyChapterCache
@@ -34,6 +35,7 @@ data class BrowseUiState(
 
 @HiltViewModel
 class BrowseViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
     private val sourcePreferences: SourcePreferences,
     private val getMangaList: GetMangaListUseCase,
     private val repository: MangaRepository,
@@ -45,7 +47,9 @@ class BrowseViewModel @Inject constructor(
 
     private var sourceId: Long = 0L
 
-    private val _uiState = MutableStateFlow(BrowseUiState())
+    private val _uiState = MutableStateFlow(
+        BrowseUiState(searchQuery = savedStateHandle.get<String>("query") ?: "")
+    )
     val uiState: StateFlow<BrowseUiState> = _uiState.asStateFlow()
 
     init {
