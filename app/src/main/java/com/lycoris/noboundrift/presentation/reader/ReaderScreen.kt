@@ -313,9 +313,9 @@ private fun PageImage(page: Page, imageRetryKey: Int, modifier: Modifier = Modif
         ImageRequest.Builder(context)
             .data(page.imageUrl)
             .memoryCacheKey("${page.imageUrl}:$imageRetryKey")
-            // Also bust the disk cache on retry so a previously bad/partial download
-            // doesn't get served again (memory cache key alone is insufficient).
-            .diskCacheKey("${page.imageUrl}:$imageRetryKey")
+            // Stable disk cache key — Coil evicts failed/partial entries automatically.
+            // Only the memory key includes retryKey so retries check disk before network.
+            .diskCacheKey(page.imageUrl)
             .size(CoilSize(Dimension.Pixels(screenWidthPx), Dimension.Pixels(maxHeightPx)))
             // Disable hardware bitmaps: hardware allocation silently returns null on some
             // devices when GPU memory is tight, causing the BitmapFactory null error.

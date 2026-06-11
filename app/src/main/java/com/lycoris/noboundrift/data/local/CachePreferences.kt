@@ -13,7 +13,7 @@ class CachePreferences @Inject constructor(private val prefs: SharedPreferences)
 
     companion object {
         const val KEY_CACHE_SIZE = "cache_size_bytes"
-        val DEFAULT = 128L * 1024 * 1024
+        const val DEFAULT = 128L * 1024 * 1024
     }
 
     fun getCacheSizeBytes(): Long = prefs.getLong(KEY_CACHE_SIZE, DEFAULT)

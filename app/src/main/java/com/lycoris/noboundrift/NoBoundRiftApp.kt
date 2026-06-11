@@ -31,9 +31,13 @@ class NoBoundRiftApp : Application(), ImageLoaderFactory {
         return ImageLoader.Builder(this)
             .okHttpClient(coilClient)
             .diskCache {
+                val diskCacheSize = if (::cachePreferences.isInitialized)
+                    cachePreferences.getCacheSizeBytes()
+                else
+                    CachePreferences.DEFAULT
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache"))
-                    .maxSizeBytes(cachePreferences.getCacheSizeBytes())
+                    .maxSizeBytes(diskCacheSize)
                     .build()
             }
             .memoryCache {

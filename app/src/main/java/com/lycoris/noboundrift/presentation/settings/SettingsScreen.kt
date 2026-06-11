@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.lycoris.noboundrift.data.local.PreloadMode
 
 private val CACHE_SIZE_OPTIONS = listOf(
     64L * 1024 * 1024 to "64 MB",
@@ -78,6 +79,24 @@ fun SettingsScreen(
                     onClick = { viewModel.setCacheSize(bytes) },
                 )
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Preload Next Chapter",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+            PreloadModeRow(
+                label = "Always",
+                selected = uiState.preloadMode == PreloadMode.ALWAYS,
+                onClick = { viewModel.setPreloadMode(PreloadMode.ALWAYS) },
+            )
+            PreloadModeRow(
+                label = "Wi-Fi only",
+                selected = uiState.preloadMode == PreloadMode.WIFI_ONLY,
+                onClick = { viewModel.setPreloadMode(PreloadMode.WIFI_ONLY) },
+            )
         }
     }
 }
@@ -117,6 +136,31 @@ private fun SourceRow(
 
 @Composable
 private fun CacheSizeRow(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = onClick,
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+        )
+    }
+}
+
+@Composable
+private fun PreloadModeRow(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,

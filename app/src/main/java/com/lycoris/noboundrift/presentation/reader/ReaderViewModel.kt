@@ -1,8 +1,13 @@
 package com.lycoris.noboundrift.presentation.reader
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lycoris.noboundrift.data.local.PreloadMode
+import com.lycoris.noboundrift.data.local.ReaderPreferences
 import com.lycoris.noboundrift.domain.model.Chapter
 import com.lycoris.noboundrift.domain.model.Page
 import com.lycoris.noboundrift.domain.repository.MangaRepository
@@ -12,6 +17,7 @@ import com.lycoris.noboundrift.domain.usecase.MarkChapterReadUseCase
 import com.lycoris.noboundrift.presentation.navigation.Screen
 import com.lycoris.noboundrift.presentation.navigation.decodeFromNav
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
@@ -50,6 +56,8 @@ class ReaderViewModel @Inject constructor(
     private val getChapterList: GetChapterListUseCase,
     private val markChapterRead: MarkChapterReadUseCase,
     private val repository: MangaRepository,
+    @ApplicationContext private val appContext: Context,
+    private val readerPreferences: ReaderPreferences,
 ) : ViewModel() {
 
     private val sourceId: Long = checkNotNull(savedStateHandle[Screen.Reader.ARG_SOURCE_ID])
@@ -152,6 +160,7 @@ class ReaderViewModel @Inject constructor(
      * loading, already loaded, or there is no next chapter.
      */
     fun onNearEnd() {
+        if (readerPreferences.getPreloadMode() == PreloadMode.WIFI_ONLY && !isOnWifi()) return
         if (_uiState.value.isLoading) return   // guard: don't auto-append while initial pages are still loading
         if (_uiState.value.isLoadingNextChapter) return
         val url = nextChapterUrl ?: return
@@ -306,6 +315,12 @@ class ReaderViewModel @Inject constructor(
         } else {
             if (idx > 0) sortedChapters[idx - 1].url else null
         }
+    }
+
+    private fun isOnWifi(): Boolean {
+        val cm = appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork ?: return false) ?: return false
+        return caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
     }
 
     private fun ReaderMode.toggle() = when (this) {
