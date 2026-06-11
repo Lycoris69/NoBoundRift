@@ -32,5 +32,5 @@ sealed class Screen(val route: String) {
     data object Settings : Screen("settings")
 }
 
-fun String.encodeForNav(): String = java.net.URLEncoder.encode(this, "UTF-8")
+fun String.encodeForNav(): String = java.net.URLEncoder.encode(this, "UTF-8").replace("+", "%20")
 fun String.decodeFromNav(): String = java.net.URLDecoder.decode(this, "UTF-8")
