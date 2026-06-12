@@ -7,6 +7,7 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.lycoris.noboundrift.data.local.CachePreferences
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.Dispatchers
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import javax.inject.Inject
@@ -45,6 +46,11 @@ class NoBoundRiftApp : Application(), ImageLoaderFactory {
                     .maxSizePercent(0.25)
                     .build()
             }
+            // Cap concurrent BitmapFactory.decodeStream() calls to prevent OOM spikes
+            // when many disk-cached images decode simultaneously at chapter boundaries.
+            // Disk cache hits bypass OkHttp's per-host limit and would otherwise all
+            // decode concurrently on Dispatchers.IO's 64-thread pool.
+            .decoderDispatcher(Dispatchers.IO.limitedParallelism(2))
             .build()
     }
 }
