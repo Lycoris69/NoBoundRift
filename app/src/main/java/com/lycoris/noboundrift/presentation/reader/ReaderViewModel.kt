@@ -183,10 +183,15 @@ class ReaderViewModel @Inject constructor(
                         _uiState.update { it.copy(isLoadingNextChapter = false) }
                         return@onSuccess
                     }
-                    // Record the segment boundary before appending (captures current page count)
-                    chapterSegments.add(ChapterSegment(url, _uiState.value.pages.size))
+                    // Capture pages.size once — this is the offset for the incoming chapter's
+                    // pages AND the segment start. Reading it once prevents a TOCTOU mismatch
+                    // if state were somehow updated between the two reads (defensive).
+                    // Re-index newPages from 0..N sequentially starting at offset: this
+                    // guarantees no key collisions even if the source returned non-contiguous
+                    // indices (e.g. gaps from skipped base64 placeholder images).
                     val offset = _uiState.value.pages.size
-                    val offsetPages = newPages.map { it.copy(index = offset + it.index) }
+                    chapterSegments.add(ChapterSegment(url, offset))
+                    val offsetPages = newPages.mapIndexed { i, page -> page.copy(index = offset + i) }
                     _uiState.update {
                         it.copy(pages = it.pages + offsetPages, isLoadingNextChapter = false)
                     }

@@ -205,22 +205,29 @@ class MangaReadSource @Inject constructor(
         withContext(Dispatchers.IO) {
             val doc = getDocument(chapterUrl)
 
+            // mapNotNull first, then re-index with mapIndexed so that Page.index is always
+            // the 0-based position in the returned list. Using mapIndexedNotNull directly
+            // assigns the DOM element position as the index — if any elements are skipped
+            // (base64 placeholders, blank src), the resulting indices have gaps. Those gaps
+            // cause a LazyColumn duplicate-key crash when onNearEnd offsets the next
+            // chapter's pages by pages.size (the count) rather than the max index value.
             doc.select("div.reading-content img")
-                .mapIndexedNotNull { index, img ->
+                .mapNotNull { img ->
                     val rawUrl = img.attr("data-src").takeIf { it.isNotBlank() }
                         ?: img.attr("data-lazy-src").takeIf { it.isNotBlank() }
                         ?: img.attr("data-original").takeIf { it.isNotBlank() }
                         ?: img.attr("src").takeIf { it.isNotBlank() }
-                        ?: return@mapIndexedNotNull null
+                        ?: return@mapNotNull null
 
-                    val imageUrl = rawUrl.trim().let {
+                    rawUrl.trim().let {
                         when {
                             it.startsWith("//") -> "https:$it"
-                            it.startsWith("data:") -> return@mapIndexedNotNull null // skip base64 placeholders
+                            it.startsWith("data:") -> return@mapNotNull null // skip base64 placeholders
                             else -> it
                         }
                     }
-
+                }
+                .mapIndexed { index, imageUrl ->
                     Page(index = index, imageUrl = imageUrl, refererUrl = chapterUrl)
                 }
         }

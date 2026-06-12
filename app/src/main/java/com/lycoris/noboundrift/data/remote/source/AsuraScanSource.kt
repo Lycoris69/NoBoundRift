@@ -231,14 +231,20 @@ class AsuraScanSource @Inject constructor(
             val pagesArray = pagesOuter.optJSONArray(1)
                 ?: return@withContext emptyList()
 
-            (0 until pagesArray.length()).mapIndexedNotNull { index, _ ->
-                runCatching {
-                    val item = pagesArray.getJSONArray(index)   // [0, {url: [0, "..."]}]
-                    val obj = item.getJSONObject(1)             // {url: [0, "..."]}
-                    val imageUrl = obj.getJSONArray("url").getString(1)
-                    if (imageUrl.isBlank()) null else Page(index = index, imageUrl = imageUrl)
-                }.getOrNull()
-            }
+            // Collect URLs first, then re-index after filtering. runCatching.getOrNull() can
+            // return null on JSON parse failures — using mapIndexedNotNull would assign the
+            // array position as the index, creating gaps that cause LazyColumn duplicate-key
+            // crashes when onNearEnd offsets the next chapter's pages by pages.size (count).
+            (0 until pagesArray.length())
+                .mapNotNull { i ->
+                    runCatching {
+                        val item = pagesArray.getJSONArray(i)   // [0, {url: [0, "..."]}]
+                        val obj = item.getJSONObject(1)         // {url: [0, "..."]}
+                        val imageUrl = obj.getJSONArray("url").getString(1)
+                        imageUrl.takeIf { it.isNotBlank() }
+                    }.getOrNull()
+                }
+                .mapIndexed { index, imageUrl -> Page(index = index, imageUrl = imageUrl) }
         }
 
 }
