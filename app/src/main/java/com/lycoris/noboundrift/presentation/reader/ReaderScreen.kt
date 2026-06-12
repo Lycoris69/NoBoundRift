@@ -61,6 +61,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImagePainter
 import coil.compose.SubcomposeAsyncImage
+import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Dimension
 import coil.size.Size as CoilSize
@@ -312,14 +313,16 @@ private fun PageImage(page: Page, imageRetryKey: Int, modifier: Modifier = Modif
     val model = remember(page.imageUrl, imageRetryKey, screenWidthPx) {
         ImageRequest.Builder(context)
             .data(page.imageUrl)
-            .memoryCacheKey("${page.imageUrl}:$imageRetryKey")
-            // Stable disk cache key — Coil evicts failed/partial entries automatically.
-            // Only the memory key includes retryKey so retries check disk before network.
             .diskCacheKey(page.imageUrl)
             .size(CoilSize(Dimension.Pixels(screenWidthPx), Dimension.Pixels(maxHeightPx)))
             // Disable hardware bitmaps: hardware allocation silently returns null on some
             // devices when GPU memory is tight, causing the BitmapFactory null error.
             .allowHardware(false)
+            // Do not keep off-screen reader pages in the memory cache. With large webtoon
+            // strips (20-40 MB each), the LRU cache fills available heap before the next
+            // chapter even starts decoding. The 512 MB disk cache is fast enough to
+            // re-decode on re-scroll without the OOM risk.
+            .memoryCachePolicy(CachePolicy.DISABLED)
             .apply {
                 page.refererUrl?.let { addHeader("Referer", it) }
             }
