@@ -50,4 +50,6 @@ interface MangaRepository {
 
     /** Emits the last-read chapter URL for a given manga, or null if unread. */
     fun getLastReadChapter(mangaId: String): Flow<String?>
+
+    fun observeReadChapterUrls(mangaId: String): Flow<Set<String>>
 }

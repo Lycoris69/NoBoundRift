@@ -149,6 +149,12 @@ class ReaderViewModel @Inject constructor(
         // viewModelScope is already cancelled when onDispose fires during navigation.
         // GlobalScope + NonCancellable guarantees these DB writes always complete.
         GlobalScope.launch(NonCancellable) {
+            val activeIndex = chapterSegments.indexOf(activeSegment)
+            for (i in 0 until activeIndex) {
+                val seg = chapterSegments[i]
+                sortedChapters.find { it.url.trimEnd('/') == seg.url.trimEnd('/') }
+                    ?.let { markChapterRead(it) }
+            }
             repository.touchLastOpenedChapter(chapter)
             if (shouldMarkRead) markChapterRead(chapter)
         }

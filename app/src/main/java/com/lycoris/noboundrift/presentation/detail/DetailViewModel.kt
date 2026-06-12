@@ -140,6 +140,18 @@ class DetailViewModel @Inject constructor(
                     }
                 }
             }
+            launch {
+                repository.observeReadChapterUrls(mangaId).collect { readUrls ->
+                    _uiState.update { state ->
+                        (state as? DetailUiState.Success)?.let { s ->
+                            val updated = s.manga.chapters.map { ch ->
+                                ch.copy(read = ch.url.trimEnd('/') in readUrls)
+                            }
+                            s.copy(manga = s.manga.copy(chapters = updated))
+                        } ?: state
+                    }
+                }
+            }
         }
     }
 
