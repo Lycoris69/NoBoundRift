@@ -146,15 +146,19 @@ class ReaderViewModel @Inject constructor(
         val pageWithinChapter = state.currentPageIndex - activeSegment.startIndex + 1
         val shouldMarkRead = chapterPageCount > 0 && (pageWithinChapter.toFloat() / chapterPageCount) >= 0.8f
 
+        // Snapshot segment data on the main thread before launching on a background thread.
+        // chapterSegments is a plain mutableListOf written on the main thread — reading it
+        // from Dispatchers.Default inside GlobalScope would be a data race.
+        val activeIndex = chapterSegments.indexOf(activeSegment)
+        val priorChapters = (0 until activeIndex).mapNotNull { i ->
+            val seg = chapterSegments[i]
+            sortedChapters.find { it.url.trimEnd('/') == seg.url.trimEnd('/') }
+        }
+
         // viewModelScope is already cancelled when onDispose fires during navigation.
         // GlobalScope + NonCancellable guarantees these DB writes always complete.
         GlobalScope.launch(NonCancellable) {
-            val activeIndex = chapterSegments.indexOf(activeSegment)
-            for (i in 0 until activeIndex) {
-                val seg = chapterSegments[i]
-                sortedChapters.find { it.url.trimEnd('/') == seg.url.trimEnd('/') }
-                    ?.let { markChapterRead(it) }
-            }
+            for (prior in priorChapters) markChapterRead(prior)
             repository.touchLastOpenedChapter(chapter)
             if (shouldMarkRead) markChapterRead(chapter)
         }
