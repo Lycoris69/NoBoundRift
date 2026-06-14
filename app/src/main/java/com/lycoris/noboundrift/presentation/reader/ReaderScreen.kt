@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -212,8 +213,19 @@ private fun WebtoonReader(
 ) {
     val listState = rememberLazyListState()
 
+    // Track the page whose midpoint is closest to the viewport center.
+    // Using firstVisibleItemIndex is unreliable when off-screen items are evicted and
+    // collapse to zero height before re-measuring, which causes spurious backward jumps.
     LaunchedEffect(listState) {
-        snapshotFlow { listState.firstVisibleItemIndex }
+        snapshotFlow {
+            val layout = listState.layoutInfo
+            val viewportCenter = (layout.viewportStartOffset + layout.viewportEndOffset) / 2
+            layout.visibleItemsInfo
+                .minByOrNull { item -> kotlin.math.abs((item.offset + item.size / 2) - viewportCenter) }
+                ?.index
+        }
+            .filterNotNull()
+            .distinctUntilChanged()
             .collect { onPageVisible(it) }
     }
 
@@ -337,7 +349,12 @@ private fun PageImage(page: Page, imageRetryKey: Int, modifier: Modifier = Modif
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.5f),
+                    // Fixed minimum height keeps the placeholder tall enough that the
+                    // LazyColumn does not collapse items when they are evicted from the
+                    // Coil memory cache (disabled) and must re-decode from disk. Without
+                    // this, collapsing placeholders shift firstVisibleItemIndex and cause
+                    // the chapter indicator to jump back. Also spaces out the spinners.
+                    .heightIn(min = 600.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 CircularProgressIndicator(color = Color.White)
