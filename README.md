@@ -5,7 +5,7 @@
 Personal Android manga and webtoon reader. Content is sourced by scraping third-party websites — no official APIs involved.
 
 > [!CAUTION]
-> **Personal use only. This app scrapes third-party websites without their consent. Do not distribute, publish, or use commercially.**
+> **Personal use only. This app scrapes third-party websites without their consent (Not asked). Do not distribute, publish, or use commercially.**
 
 ## Features
 
