@@ -34,6 +34,7 @@ Personal Android manga and webtoon reader. Content is sourced by scraping third-
 | MangaRead | mangaread.org | Jsoup scraper |
 | Manhwaz | manhwaz.com | Jsoup scraper |
 | AsuraScans | asurascans.com | Jsoup + Astro SSR JSON props |
+| MangaDex | mangadex.org | Official REST API + CDN |
 
 ## Stack
 
