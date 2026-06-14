@@ -91,6 +91,11 @@ class DownloadRepositoryImpl @Inject constructor(
     override fun observeAllDownloads(): Flow<List<DownloadEntity>> =
         downloadDao.observeAll()
 
+    override suspend fun getCompletedDownloadsForMangaUrl(mangaUrl: String): List<DownloadEntity> {
+        val normalized = mangaUrl.trimEnd('/')
+        return downloadDao.getCompletedByMangaUrl(normalized, "$normalized/")
+    }
+
     override suspend fun getLocalPages(chapterUrl: String): List<Page>? {
         val normalized = chapterUrl.trimEnd('/')
         val entity = downloadDao.getByChapterUrl(normalized) ?: return null

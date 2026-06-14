@@ -10,4 +10,7 @@ class GetDownloadsUseCase @Inject constructor(private val repository: DownloadRe
         repository.observeDownloadsForManga(mangaId)
 
     fun all(): Flow<List<DownloadEntity>> = repository.observeAllDownloads()
+
+    suspend fun forMangaUrl(mangaUrl: String): List<DownloadEntity> =
+        repository.getCompletedDownloadsForMangaUrl(mangaUrl)
 }

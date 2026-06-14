@@ -8,6 +8,7 @@ import com.lycoris.noboundrift.data.local.entity.DownloadEntity
 import com.lycoris.noboundrift.domain.model.Chapter
 import com.lycoris.noboundrift.domain.model.Manga
 import com.lycoris.noboundrift.domain.model.MangaPreview
+import com.lycoris.noboundrift.domain.model.MangaStatus
 import com.lycoris.noboundrift.domain.usecase.DeleteDownloadUseCase
 import com.lycoris.noboundrift.domain.usecase.GetDownloadsUseCase
 import com.lycoris.noboundrift.domain.usecase.GetMangaDetailUseCase
@@ -166,9 +167,40 @@ class DetailViewModel @Inject constructor(
                 }
                 .onFailure { throwable ->
                     if (throwable is CancellationException) throw throwable
-                    _uiState.value = DetailUiState.Error(
-                        throwable.message ?: "Failed to load manga details"
-                    )
+                    // Offline fallback: if completed downloads exist for this URL, build
+                    // a minimal detail view from local data so the user can still read.
+                    val offlineChapters = getDownloads.forMangaUrl(mangaUrl)
+                    if (offlineChapters.isNotEmpty()) {
+                        val first = offlineChapters.first()
+                        val offlineManga = Manga(
+                            id = first.mangaId,
+                            title = first.mangaTitle,
+                            coverUrl = first.mangaCoverUrl,
+                            synopsis = "",
+                            genres = emptyList(),
+                            status = MangaStatus.UNKNOWN,
+                            sourceId = first.sourceId,
+                            url = first.mangaUrl,
+                            chapters = offlineChapters.map { entity ->
+                                Chapter(
+                                    id = entity.chapterUrl,
+                                    mangaId = entity.mangaId,
+                                    title = entity.chapterTitle,
+                                    number = entity.chapterNumber,
+                                    url = entity.chapterUrl,
+                                )
+                            },
+                        )
+                        _uiState.value = DetailUiState.Success(
+                            manga = offlineManga,
+                            isLoadingChapters = false,
+                        )
+                        startObservers(first.mangaId)
+                    } else {
+                        _uiState.value = DetailUiState.Error(
+                            throwable.message ?: "Failed to load manga details"
+                        )
+                    }
                 }
         }
     }

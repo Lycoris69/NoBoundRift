@@ -35,4 +35,7 @@ interface DownloadDao {
 
     @Query("UPDATE downloads SET status = :status, totalPages = :total, downloadedPages = :downloaded WHERE chapterUrl = :chapterUrl")
     suspend fun updateProgress(chapterUrl: String, status: DownloadStatus, total: Int, downloaded: Int)
+
+    @Query("SELECT * FROM downloads WHERE (mangaUrl = :mangaUrl OR mangaUrl = :mangaUrlTrailing) AND status = 'COMPLETED' ORDER BY chapterNumber ASC")
+    suspend fun getCompletedByMangaUrl(mangaUrl: String, mangaUrlTrailing: String): List<DownloadEntity>
 }
