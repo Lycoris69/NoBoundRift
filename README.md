@@ -20,6 +20,12 @@ Personal Android manga and webtoon reader. Content is sourced by scraping third-
 - Lock icon on premium/paywalled chapters
 - User-friendly error screen with Retry instead of a crash
 - Image refresh button in the reader top bar to retry failed page loads
+- **Chapter downloads** — download chapters for offline reading in the background via WorkManager
+- **Download All** — queues every chapter sequentially (first to last) so they download one at a time
+- **Downloads tab** in the library and detail screens to manage downloaded chapters
+- **Offline fallback** — Detail screen builds from local downloads when the network is unavailable
+- Friendly offline error with WifiOff icon in Browse instead of a raw exception message
+- Refresh button in the Browse search bar to re-run the current search
 
 ## Sources
 
@@ -35,6 +41,7 @@ Personal Android manga and webtoon reader. Content is sourced by scraping third-
 - **OkHttp** + **Jsoup** for HTTP/scraping
 - **Coil** for image loading
 - **Room** for local persistence
+- **WorkManager** for background chapter downloads
 - **Hilt** for dependency injection
 - **Coroutines + Flow** for async
 
