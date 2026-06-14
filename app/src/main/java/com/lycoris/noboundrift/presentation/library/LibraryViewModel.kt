@@ -2,8 +2,11 @@ package com.lycoris.noboundrift.presentation.library
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lycoris.noboundrift.data.local.entity.DownloadEntity
+import com.lycoris.noboundrift.data.local.entity.DownloadStatus
 import com.lycoris.noboundrift.domain.model.MangaPreview
 import com.lycoris.noboundrift.domain.repository.MangaRepository
+import com.lycoris.noboundrift.domain.usecase.GetDownloadsUseCase
 import com.lycoris.noboundrift.domain.usecase.GetLibraryUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,15 +17,31 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+enum class LibraryTab { LIBRARY, DOWNLOADS }
+
+data class MangaDownloadGroup(
+    val mangaId: String,
+    val mangaUrl: String,
+    val sourceId: Long,
+    val mangaTitle: String,
+    val mangaCoverUrl: String,
+    val chapters: List<DownloadEntity>,
+    val completedCount: Int,
+    val totalCount: Int,
+)
+
 data class LibraryUiState(
     val manga: List<MangaPreview> = emptyList(),
     val isEmpty: Boolean = false,
+    val selectedTab: LibraryTab = LibraryTab.LIBRARY,
+    val downloadGroups: List<MangaDownloadGroup> = emptyList(),
 )
 
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
     getLibrary: GetLibraryUseCase,
     private val repository: MangaRepository,
+    getDownloads: GetDownloadsUseCase,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LibraryUiState())
@@ -40,10 +59,38 @@ class LibraryViewModel @Inject constructor(
         viewModelScope.launch {
             getLibrary().collect { list ->
                 if (!suppressDbUpdates) {
-                    _uiState.update { LibraryUiState(manga = list, isEmpty = list.isEmpty()) }
+                    _uiState.update { current ->
+                        current.copy(manga = list, isEmpty = list.isEmpty())
+                    }
                 }
             }
         }
+
+        viewModelScope.launch {
+            getDownloads.all().collect { entities ->
+                val groups = entities
+                    .groupBy { it.mangaId }
+                    .map { (_, list) ->
+                        val first = list.first()
+                        MangaDownloadGroup(
+                            mangaId = first.mangaId,
+                            mangaUrl = first.mangaUrl,
+                            sourceId = first.sourceId,
+                            mangaTitle = first.mangaTitle,
+                            mangaCoverUrl = first.mangaCoverUrl,
+                            chapters = list.sortedBy { it.chapterNumber },
+                            completedCount = list.count { it.status == DownloadStatus.COMPLETED },
+                            totalCount = list.size,
+                        )
+                    }
+                    .sortedBy { it.mangaTitle }
+                _uiState.update { it.copy(downloadGroups = groups) }
+            }
+        }
+    }
+
+    fun setTab(tab: LibraryTab) {
+        _uiState.update { it.copy(selectedTab = tab) }
     }
 
     fun onMove(fromIndex: Int, toIndex: Int) {

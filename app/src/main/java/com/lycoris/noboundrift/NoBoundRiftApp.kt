@@ -1,6 +1,8 @@
 package com.lycoris.noboundrift
 
 import android.app.Application
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.Configuration
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
@@ -13,12 +15,21 @@ import okhttp3.OkHttpClient
 import javax.inject.Inject
 
 @HiltAndroidApp
-class NoBoundRiftApp : Application(), ImageLoaderFactory {
+class NoBoundRiftApp : Application(), ImageLoaderFactory, Configuration.Provider {
 
     // Field-injected by Hilt after Application.onCreate so the singleton client
     // is shared between all scrapers and Coil (one connection pool, shared cookies).
     @Inject lateinit var okHttpClient: OkHttpClient
     @Inject lateinit var cachePreferences: CachePreferences
+
+    // Injected to supply a Hilt-aware worker factory; WorkManager's default
+    // initializer is disabled in AndroidManifest.xml so this factory is used instead.
+    @Inject lateinit var workerFactory: HiltWorkerFactory
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setWorkerFactory(workerFactory)
+            .build()
 
     override fun newImageLoader(): ImageLoader {
         // Derive a Coil-specific client from the shared singleton: keep all interceptors,

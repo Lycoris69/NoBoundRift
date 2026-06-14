@@ -8,6 +8,7 @@ import com.lycoris.noboundrift.domain.model.Chapter
 import com.lycoris.noboundrift.domain.model.Manga
 import com.lycoris.noboundrift.domain.model.MangaPreview
 import com.lycoris.noboundrift.domain.model.Page
+import com.lycoris.noboundrift.domain.repository.DownloadRepository
 import com.lycoris.noboundrift.domain.repository.MangaRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
@@ -20,6 +21,7 @@ class MangaRepositoryImpl @Inject constructor(
     private val sourceManager: SourceManager,
     private val mangaDao: MangaDao,
     private val chapterDao: ChapterDao,
+    private val downloadRepository: DownloadRepository,
 ) : MangaRepository {
 
     private inline fun <T> resultCatching(block: () -> T): Result<T> =
@@ -55,7 +57,9 @@ class MangaRepositoryImpl @Inject constructor(
 
     override suspend fun fetchPageList(sourceId: Long, chapterUrl: String): Result<List<Page>> =
         resultCatching {
-            sourceManager.getSource(sourceId).fetchPageList(chapterUrl)
+            // Serve from local storage if the chapter has been fully downloaded; fall back to network.
+            downloadRepository.getLocalPages(chapterUrl)
+                ?: sourceManager.getSource(sourceId).fetchPageList(chapterUrl)
         }
 
     // ── Library (Room-backed) ─────────────────────────────────────────────────

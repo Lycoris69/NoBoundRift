@@ -24,6 +24,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.BookmarkRemove
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
@@ -37,6 +40,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -51,6 +56,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.lycoris.noboundrift.data.local.entity.DownloadEntity
+import com.lycoris.noboundrift.data.local.entity.DownloadStatus
 import com.lycoris.noboundrift.domain.model.Chapter
 import com.lycoris.noboundrift.domain.model.Manga
 import com.lycoris.noboundrift.presentation.theme.ReadIndicator
@@ -121,11 +128,17 @@ fun DetailScreen(
                         lastReadChapterUrl = state.lastReadChapterUrl,
                         availableLanguages = state.availableLanguages,
                         selectedLanguage = state.selectedLanguage,
+                        selectedTab = state.selectedTab,
+                        downloads = state.downloads,
+                        onTabSelect = viewModel::setTab,
                         onToggleOrder = viewModel::toggleChapterOrder,
                         onLanguageSelect = viewModel::setLanguage,
                         onChapterClick = { chapter ->
                             onChapterClick(state.manga.sourceId, state.manga.url, chapter.url, state.manga.title)
                         },
+                        onDownloadChapter = viewModel::downloadChapter,
+                        onDownloadAll = viewModel::downloadAllChapters,
+                        onDeleteDownload = viewModel::deleteDownload,
                     )
                 }
             }
@@ -142,9 +155,15 @@ private fun MangaDetail(
     lastReadChapterUrl: String?,
     availableLanguages: List<String>,
     selectedLanguage: String,
+    selectedTab: DetailTab,
+    downloads: Map<String, DownloadEntity>,
+    onTabSelect: (DetailTab) -> Unit,
     onToggleOrder: () -> Unit,
     onLanguageSelect: (String) -> Unit,
     onChapterClick: (Chapter) -> Unit,
+    onDownloadChapter: (Chapter) -> Unit,
+    onDownloadAll: () -> Unit,
+    onDeleteDownload: (String) -> Unit,
 ) {
     val continueChapter = remember(manga.chapters, lastReadChapterUrl) {
         lastReadChapterUrl?.let { url -> manga.chapters.find { it.url.trimEnd('/') == url } }
@@ -215,73 +234,104 @@ private fun MangaDetail(
             }
         }
 
-        // Chapter list header
+        // Tab row — Chapters / Downloads
         item {
-            HorizontalDivider()
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(top = 8.dp),
-            ) {
-                Text(
-                    text = "${displayedChapters.size} Chapters",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
-                )
-                if (isLoadingChapters) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-                IconButton(onClick = onToggleOrder, enabled = !isLoadingChapters) {
-                    Icon(
-                        imageVector = if (chaptersReversed) Icons.Default.KeyboardArrowUp
-                        else Icons.Default.KeyboardArrowDown,
-                        contentDescription = if (chaptersReversed) "Oldest first" else "Newest first",
+            TabRow(selectedTabIndex = selectedTab.ordinal) {
+                DetailTab.entries.forEach { tab ->
+                    Tab(
+                        selected = selectedTab == tab,
+                        onClick = { onTabSelect(tab) },
+                        text = { Text(if (tab == DetailTab.CHAPTERS) "Chapters" else "Downloads") },
                     )
                 }
             }
         }
 
-        // Language selector — only shown for multi-language sources (e.g. MangaDex)
-        if (availableLanguages.size > 1) {
+        if (selectedTab == DetailTab.CHAPTERS) {
+            // Chapter list header
             item {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    contentPadding = PaddingValues(vertical = 4.dp),
-                    modifier = Modifier.fillMaxWidth(),
+                HorizontalDivider()
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(top = 8.dp),
                 ) {
-                    items(availableLanguages) { lang ->
-                        FilterChip(
-                            selected = lang == selectedLanguage,
-                            onClick = { onLanguageSelect(lang) },
-                            label = {
-                                Text(
-                                    text = java.util.Locale(lang).displayLanguage.ifBlank { lang.uppercase() },
-                                    style = MaterialTheme.typography.labelSmall,
-                                )
-                            },
+                    Text(
+                        text = "${displayedChapters.size} Chapters",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (isLoadingChapters) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    IconButton(onClick = onToggleOrder, enabled = !isLoadingChapters) {
+                        Icon(
+                            imageVector = if (chaptersReversed) Icons.Default.KeyboardArrowUp
+                            else Icons.Default.KeyboardArrowDown,
+                            contentDescription = if (chaptersReversed) "Oldest first" else "Newest first",
                         )
                     }
                 }
             }
-        }
 
-        // Continue Reading button — only present after at least one chapter has been read
-        if (continueChapter != null) {
-            item {
-                val n = continueChapter.number
-                val label = continueChapter.title.ifBlank { "Chapter ${if (n % 1f == 0f) n.toInt() else n}" }
-                Button(
-                    onClick = { onChapterClick(continueChapter) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(text = "Continue: $label")
+            // Language selector — only shown for multi-language sources (e.g. MangaDex)
+            if (availableLanguages.size > 1) {
+                item {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        contentPadding = PaddingValues(vertical = 4.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        items(availableLanguages) { lang ->
+                            FilterChip(
+                                selected = lang == selectedLanguage,
+                                onClick = { onLanguageSelect(lang) },
+                                label = {
+                                    Text(
+                                        text = java.util.Locale(lang).displayLanguage.ifBlank { lang.uppercase() },
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                },
+                            )
+                        }
+                    }
                 }
             }
-        }
 
-        // Chapter rows
-        items(displayedChapters, key = { it.id }) { chapter ->
-            ChapterRow(chapter = chapter, onClick = { onChapterClick(chapter) })
+            // Continue Reading button — only present after at least one chapter has been read
+            if (continueChapter != null) {
+                item {
+                    val n = continueChapter.number
+                    val label = continueChapter.title.ifBlank { "Chapter ${if (n % 1f == 0f) n.toInt() else n}" }
+                    Button(
+                        onClick = { onChapterClick(continueChapter) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(text = "Continue: $label")
+                    }
+                }
+            }
+
+            // Chapter rows
+            items(displayedChapters, key = { it.id }) { chapter ->
+                ChapterRow(chapter = chapter, onClick = { onChapterClick(chapter) })
+            }
+        } else {
+            // Downloads tab content
+            item {
+                Button(onClick = onDownloadAll, modifier = Modifier.fillMaxWidth()) {
+                    Text("Download All")
+                }
+            }
+
+            items(displayedChapters, key = { it.id }) { chapter ->
+                DownloadChapterRow(
+                    chapter = chapter,
+                    entity = downloads[chapter.url.trimEnd('/')],
+                    onDownload = { onDownloadChapter(chapter) },
+                    onDelete = { onDeleteDownload(chapter.url) },
+                )
+            }
         }
     }
 }
@@ -331,6 +381,75 @@ private fun ChapterRow(chapter: Chapter, onClick: () -> Unit) {
                 modifier = Modifier.size(14.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+@Composable
+private fun DownloadChapterRow(
+    chapter: Chapter,
+    entity: DownloadEntity?,
+    onDownload: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = chapter.title.ifBlank { val n = chapter.number; "Chapter ${if (n % 1f == 0f) n.toInt() else n}" },
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            // Status subtitle
+            val statusText = when (entity?.status) {
+                DownloadStatus.QUEUED -> "Queued"
+                DownloadStatus.DOWNLOADING -> "${entity.downloadedPages} / ${entity.totalPages} pages"
+                DownloadStatus.COMPLETED -> "Downloaded"
+                DownloadStatus.FAILED -> "Failed"
+                null -> ""
+            }
+            if (statusText.isNotEmpty()) {
+                Text(
+                    text = statusText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        when (entity?.status) {
+            null, DownloadStatus.FAILED -> {
+                // Download button
+                IconButton(onClick = onDownload) {
+                    Icon(
+                        Icons.Default.Download,
+                        contentDescription = "Download",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            DownloadStatus.QUEUED, DownloadStatus.DOWNLOADING -> {
+                // Cancel button — delete also cancels WorkManager
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Cancel download",
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+            DownloadStatus.COMPLETED -> {
+                // Delete button
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Delete download",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.lycoris.noboundrift.data.local.NoBoundRiftDatabase
 import com.lycoris.noboundrift.data.local.dao.ChapterDao
+import com.lycoris.noboundrift.data.local.dao.DownloadDao
 import com.lycoris.noboundrift.data.local.dao.MangaDao
 import dagger.Module
 import dagger.Provides
@@ -34,4 +35,7 @@ object DatabaseModule {
 
     @Provides
     fun provideChapterDao(db: NoBoundRiftDatabase): ChapterDao = db.chapterDao()
+
+    @Provides
+    fun provideDownloadDao(db: NoBoundRiftDatabase): DownloadDao = db.downloadDao()
 }

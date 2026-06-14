@@ -4,9 +4,14 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lycoris.noboundrift.data.local.EmptyChapterCache
+import com.lycoris.noboundrift.data.local.entity.DownloadEntity
+import com.lycoris.noboundrift.domain.model.Chapter
 import com.lycoris.noboundrift.domain.model.Manga
 import com.lycoris.noboundrift.domain.model.MangaPreview
+import com.lycoris.noboundrift.domain.usecase.DeleteDownloadUseCase
+import com.lycoris.noboundrift.domain.usecase.GetDownloadsUseCase
 import com.lycoris.noboundrift.domain.usecase.GetMangaDetailUseCase
+import com.lycoris.noboundrift.domain.usecase.QueueDownloadUseCase
 import com.lycoris.noboundrift.domain.usecase.ToggleLibraryUseCase
 import com.lycoris.noboundrift.domain.repository.MangaRepository
 import com.lycoris.noboundrift.presentation.navigation.Screen
@@ -21,6 +26,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+enum class DetailTab { CHAPTERS, DOWNLOADS }
+
 sealed interface DetailUiState {
     data object Loading : DetailUiState
     data class Success(
@@ -31,6 +38,8 @@ sealed interface DetailUiState {
         val lastReadChapterUrl: String? = null,
         val availableLanguages: List<String> = emptyList(),
         val selectedLanguage: String = "",
+        val selectedTab: DetailTab = DetailTab.CHAPTERS,
+        val downloads: Map<String, DownloadEntity> = emptyMap(),
     ) : DetailUiState
     data class Error(val message: String) : DetailUiState
 }
@@ -42,6 +51,9 @@ class DetailViewModel @Inject constructor(
     private val toggleLibrary: ToggleLibraryUseCase,
     private val repository: MangaRepository,
     private val emptyChapterCache: EmptyChapterCache,
+    private val queueDownload: QueueDownloadUseCase,
+    private val deleteDownloadUseCase: DeleteDownloadUseCase,
+    private val getDownloads: GetDownloadsUseCase,
 ) : ViewModel() {
 
     private val sourceId: Long = checkNotNull(savedStateHandle[Screen.Detail.ARG_SOURCE_ID])
@@ -79,6 +91,44 @@ class DetailViewModel @Inject constructor(
             toggleLibrary(preview, state.isInLibrary)
             // Room Flow collector will update isInLibrary within one write cycle; no optimistic update needed.
         }
+    }
+
+    fun setTab(tab: DetailTab) {
+        _uiState.update { state ->
+            (state as? DetailUiState.Success)?.copy(selectedTab = tab) ?: state
+        }
+    }
+
+    fun downloadChapter(chapter: Chapter) {
+        val state = _uiState.value as? DetailUiState.Success ?: return
+        viewModelScope.launch {
+            queueDownload(
+                sourceId = state.manga.sourceId,
+                mangaId = state.manga.id,
+                mangaUrl = state.manga.url,
+                mangaTitle = state.manga.title,
+                mangaCoverUrl = state.manga.coverUrl,
+                chapter = chapter,
+            )
+        }
+    }
+
+    fun downloadAllChapters() {
+        val state = _uiState.value as? DetailUiState.Success ?: return
+        viewModelScope.launch {
+            queueDownload.all(
+                sourceId = state.manga.sourceId,
+                mangaId = state.manga.id,
+                mangaUrl = state.manga.url,
+                mangaTitle = state.manga.title,
+                mangaCoverUrl = state.manga.coverUrl,
+                chapters = state.manga.chapters,
+            )
+        }
+    }
+
+    fun deleteDownload(chapterUrl: String) {
+        viewModelScope.launch { deleteDownloadUseCase(chapterUrl) }
     }
 
     private fun loadDetail() {
@@ -149,6 +199,14 @@ class DetailViewModel @Inject constructor(
                             }
                             s.copy(manga = s.manga.copy(chapters = updated))
                         } ?: state
+                    }
+                }
+            }
+            launch {
+                getDownloads(mangaId).collect { entities ->
+                    val map = entities.associateBy { it.chapterUrl }
+                    _uiState.update { state ->
+                        (state as? DetailUiState.Success)?.copy(downloads = map) ?: state
                     }
                 }
             }
