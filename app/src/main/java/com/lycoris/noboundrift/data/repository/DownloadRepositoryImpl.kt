@@ -65,9 +65,58 @@ class DownloadRepositoryImpl @Inject constructor(
         mangaCoverUrl: String,
         chapters: List<Chapter>,
     ) {
-        chapters.forEach { chapter ->
-            queueChapter(sourceId, mangaId, mangaUrl, mangaTitle, mangaCoverUrl, chapter)
+        // Filter to chapters that actually need downloading
+        val toDownload = chapters.filter { chapter ->
+            val normalized = chapter.url.trimEnd('/')
+            val existing = downloadDao.getByChapterUrl(normalized)
+            existing == null || existing.status == DownloadStatus.FAILED
         }
+        if (toDownload.isEmpty()) return
+
+        // Insert all as QUEUED immediately so the UI reflects them all at once
+        toDownload.forEach { chapter ->
+            val normalized = chapter.url.trimEnd('/')
+            val localDir = buildLocalDir(mangaId, chapter)
+            downloadDao.insert(
+                DownloadEntity(
+                    chapterUrl = normalized,
+                    mangaId = mangaId,
+                    mangaUrl = mangaUrl,
+                    sourceId = sourceId,
+                    mangaTitle = mangaTitle,
+                    mangaCoverUrl = mangaCoverUrl,
+                    chapterTitle = chapter.title.ifBlank { "Chapter ${chapter.number.toInt()}" },
+                    chapterNumber = chapter.number,
+                    status = DownloadStatus.QUEUED,
+                    localDir = localDir,
+                    queuedAt = System.currentTimeMillis(),
+                )
+            )
+        }
+
+        // Build a sequential WorkManager chain: chapter N starts only after chapter N-1 finishes
+        val requests = toDownload.map { chapter ->
+            val normalized = chapter.url.trimEnd('/')
+            val localDir = buildLocalDir(mangaId, chapter)
+            OneTimeWorkRequestBuilder<ChapterDownloadWorker>()
+                .setInputData(
+                    Data.Builder()
+                        .putLong(ChapterDownloadWorker.KEY_SOURCE_ID, sourceId)
+                        .putString(ChapterDownloadWorker.KEY_CHAPTER_URL, normalized)
+                        .putString(ChapterDownloadWorker.KEY_LOCAL_DIR, localDir)
+                        .build()
+                )
+                .build()
+        }
+
+        val chainName = "manga_dl_${mangaId.hashCode()}"
+        var continuation = workManager.beginUniqueWork(
+            chainName,
+            ExistingWorkPolicy.APPEND_OR_REPLACE,
+            requests.first(),
+        )
+        requests.drop(1).forEach { req -> continuation = continuation.then(req) }
+        continuation.enqueue()
     }
 
     override suspend fun cancelDownload(chapterUrl: String) {

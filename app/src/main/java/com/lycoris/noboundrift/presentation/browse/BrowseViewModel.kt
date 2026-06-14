@@ -99,6 +99,14 @@ class BrowseViewModel @Inject constructor(
         loadPage(state.currentPage)
     }
 
+    fun refresh() {
+        searchJob?.cancel()
+        loadJob?.cancel()
+        crossSourceJob?.cancel()
+        _uiState.update { it.copy(manga = emptyList(), currentPage = 1, canLoadMore = true, error = null) }
+        loadPage(page = 1)
+    }
+
     /**
      * Called whenever the search field value changes. Resets the list to page 1 and
      * debounces the network call by 400 ms so we don't fire on every keystroke.
@@ -210,11 +218,17 @@ class BrowseViewModel @Inject constructor(
                 }
                 .onFailure { throwable ->
                     if (throwable is CancellationException) return@launch
+                    val message = when (throwable) {
+                        is java.net.UnknownHostException,
+                        is java.net.SocketException -> "No internet connection"
+                        is java.net.SocketTimeoutException -> "Connection timed out"
+                        else -> throwable.message ?: "Failed to load manga"
+                    }
                     _uiState.update {
                         it.copy(
                             isLoading = false,
                             isLoadingMore = false,
-                            error = throwable.message ?: "Failed to load manga",
+                            error = message,
                         )
                     }
                 }

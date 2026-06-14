@@ -179,6 +179,11 @@ private fun MangaDetail(
         if (chaptersReversed) filtered.reversed() else filtered
     }
 
+    val allDownloaded = remember(displayedChapters, downloads) {
+        displayedChapters.isNotEmpty() &&
+            displayedChapters.all { downloads[it.url.trimEnd('/')]?.status == DownloadStatus.COMPLETED }
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -323,9 +328,11 @@ private fun MangaDetail(
             }
         } else {
             // Downloads tab content
-            item {
-                Button(onClick = onDownloadAll, modifier = Modifier.fillMaxWidth()) {
-                    Text("Download All")
+            if (!allDownloaded) {
+                item {
+                    Button(onClick = onDownloadAll, modifier = Modifier.fillMaxWidth()) {
+                        Text("Download All")
+                    }
                 }
             }
 
