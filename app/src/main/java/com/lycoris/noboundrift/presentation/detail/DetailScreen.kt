@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -314,7 +315,11 @@ private fun MangaDetail(
 
             // Chapter rows
             items(displayedChapters, key = { it.id }) { chapter ->
-                ChapterRow(chapter = chapter, onClick = { onChapterClick(chapter) })
+                ChapterRow(
+                    chapter = chapter,
+                    isDownloaded = downloads[chapter.url.trimEnd('/')]?.status == DownloadStatus.COMPLETED,
+                    onClick = { onChapterClick(chapter) },
+                )
             }
         } else {
             // Downloads tab content
@@ -337,7 +342,7 @@ private fun MangaDetail(
 }
 
 @Composable
-private fun ChapterRow(chapter: Chapter, onClick: () -> Unit) {
+private fun ChapterRow(chapter: Chapter, isDownloaded: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -372,6 +377,15 @@ private fun ChapterRow(chapter: Chapter, onClick: () -> Unit) {
                     color = Color.White,
                 )
             }
+        }
+        if (isDownloaded) {
+            Spacer(modifier = Modifier.width(4.dp))
+            Icon(
+                imageVector = Icons.Default.DownloadDone,
+                contentDescription = "Downloaded",
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
         }
         if (chapter.isLocked) {
             Spacer(modifier = Modifier.width(4.dp))
