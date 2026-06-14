@@ -1,6 +1,7 @@
 package com.lycoris.noboundrift.presentation.library
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
@@ -44,6 +45,7 @@ import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.lycoris.noboundrift.data.local.LibraryLayout
 import com.lycoris.noboundrift.domain.model.MangaPreview
 import com.lycoris.noboundrift.presentation.common.MangaCard
 
@@ -72,6 +74,8 @@ fun LibraryScreen(
             LibraryTab.LIBRARY -> {
                 if (uiState.isEmpty) {
                     EmptyLibrary()
+                } else if (uiState.libraryLayout == LibraryLayout.LIST) {
+                    LibraryList(uiState = uiState, onMangaClick = onMangaClick)
                 } else {
                     LibraryGrid(
                         uiState = uiState,
@@ -166,6 +170,59 @@ private fun LibraryGrid(
                         )
                     },
             )
+        }
+    }
+}
+
+@Composable
+private fun LibraryList(
+    uiState: LibraryUiState,
+    onMangaClick: (MangaPreview) -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(vertical = 4.dp),
+    ) {
+        items(uiState.manga, key = { it.id }) { preview ->
+            val isNew = preview.latestChapterAt > System.currentTimeMillis() - NEW_CHAPTER_WINDOW_MS
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onMangaClick(preview) }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Box {
+                    AsyncImage(
+                        model = preview.coverUrl,
+                        contentDescription = preview.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(6.dp)),
+                    )
+                    if (isNew) {
+                        Text(
+                            text = "NEW",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onError,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .background(
+                                    color = MaterialTheme.colorScheme.error,
+                                    shape = RoundedCornerShape(topEnd = 6.dp, bottomStart = 4.dp),
+                                )
+                                .padding(horizontal = 4.dp, vertical = 2.dp),
+                        )
+                    }
+                }
+                Text(
+                    text = preview.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
     }
 }

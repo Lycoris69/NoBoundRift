@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.lycoris.noboundrift.data.local.LibraryLayout
 import com.lycoris.noboundrift.data.local.PreloadMode
 
 private val CACHE_SIZE_OPTIONS = listOf(
@@ -98,6 +99,24 @@ fun SettingsScreen(
                 label = "Wi-Fi only",
                 selected = uiState.preloadMode == PreloadMode.WIFI_ONLY,
                 onClick = { viewModel.setPreloadMode(PreloadMode.WIFI_ONLY) },
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Library Layout",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+            PreloadModeRow(
+                label = "Grid",
+                selected = uiState.libraryLayout == LibraryLayout.GRID,
+                onClick = { viewModel.setLibraryLayout(LibraryLayout.GRID) },
+            )
+            PreloadModeRow(
+                label = "List",
+                selected = uiState.libraryLayout == LibraryLayout.LIST,
+                onClick = { viewModel.setLibraryLayout(LibraryLayout.LIST) },
             )
         }
     }

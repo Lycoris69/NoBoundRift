@@ -2,6 +2,8 @@ package com.lycoris.noboundrift.presentation.library
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lycoris.noboundrift.data.local.LibraryLayout
+import com.lycoris.noboundrift.data.local.LibraryPreferences
 import com.lycoris.noboundrift.data.local.entity.DownloadEntity
 import com.lycoris.noboundrift.data.local.entity.DownloadStatus
 import com.lycoris.noboundrift.domain.model.MangaPreview
@@ -35,6 +37,7 @@ data class LibraryUiState(
     val isEmpty: Boolean = false,
     val selectedTab: LibraryTab = LibraryTab.LIBRARY,
     val downloadGroups: List<MangaDownloadGroup> = emptyList(),
+    val libraryLayout: LibraryLayout = LibraryLayout.GRID,
 )
 
 @HiltViewModel
@@ -42,6 +45,7 @@ class LibraryViewModel @Inject constructor(
     getLibrary: GetLibraryUseCase,
     private val repository: MangaRepository,
     getDownloads: GetDownloadsUseCase,
+    libraryPreferences: LibraryPreferences,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LibraryUiState())
@@ -63,6 +67,12 @@ class LibraryViewModel @Inject constructor(
                         current.copy(manga = list, isEmpty = list.isEmpty())
                     }
                 }
+            }
+        }
+
+        viewModelScope.launch {
+            libraryPreferences.observeLibraryLayout().collect { layout ->
+                _uiState.update { it.copy(libraryLayout = layout) }
             }
         }
 
