@@ -9,6 +9,7 @@ import com.lycoris.noboundrift.domain.model.Chapter
 import com.lycoris.noboundrift.domain.model.Manga
 import com.lycoris.noboundrift.domain.model.MangaPreview
 import com.lycoris.noboundrift.domain.model.MangaStatus
+import com.lycoris.noboundrift.domain.usecase.CancelAllDownloadsUseCase
 import com.lycoris.noboundrift.domain.usecase.DeleteDownloadUseCase
 import com.lycoris.noboundrift.domain.usecase.GetDownloadsUseCase
 import com.lycoris.noboundrift.domain.usecase.GetMangaDetailUseCase
@@ -54,6 +55,7 @@ class DetailViewModel @Inject constructor(
     private val emptyChapterCache: EmptyChapterCache,
     private val queueDownload: QueueDownloadUseCase,
     private val deleteDownloadUseCase: DeleteDownloadUseCase,
+    private val cancelAllDownloadsUseCase: CancelAllDownloadsUseCase,
     private val getDownloads: GetDownloadsUseCase,
 ) : ViewModel() {
 
@@ -130,6 +132,11 @@ class DetailViewModel @Inject constructor(
 
     fun deleteDownload(chapterUrl: String) {
         viewModelScope.launch { deleteDownloadUseCase(chapterUrl) }
+    }
+
+    fun cancelAllDownloads() {
+        val mangaId = (_uiState.value as? DetailUiState.Success)?.manga?.id ?: return
+        viewModelScope.launch { cancelAllDownloadsUseCase(mangaId) }
     }
 
     private fun loadDetail() {

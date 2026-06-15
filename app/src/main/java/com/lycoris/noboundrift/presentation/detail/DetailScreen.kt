@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -139,6 +140,7 @@ fun DetailScreen(
                         },
                         onDownloadChapter = viewModel::downloadChapter,
                         onDownloadAll = viewModel::downloadAllChapters,
+                        onCancelAll = viewModel::cancelAllDownloads,
                         onDeleteDownload = viewModel::deleteDownload,
                     )
                 }
@@ -164,6 +166,7 @@ private fun MangaDetail(
     onChapterClick: (Chapter) -> Unit,
     onDownloadChapter: (Chapter) -> Unit,
     onDownloadAll: () -> Unit,
+    onCancelAll: () -> Unit,
     onDeleteDownload: (String) -> Unit,
 ) {
     val continueChapter = remember(manga.chapters, lastReadChapterUrl) {
@@ -182,6 +185,13 @@ private fun MangaDetail(
     val allDownloaded = remember(displayedChapters, downloads) {
         displayedChapters.isNotEmpty() &&
             displayedChapters.all { downloads[it.url.trimEnd('/')]?.status == DownloadStatus.COMPLETED }
+    }
+
+    val hasActiveDownloads = remember(displayedChapters, downloads) {
+        displayedChapters.any {
+            val s = downloads[it.url.trimEnd('/')]?.status
+            s == DownloadStatus.QUEUED || s == DownloadStatus.DOWNLOADING
+        }
     }
 
     LazyColumn(
@@ -328,7 +338,17 @@ private fun MangaDetail(
             }
         } else {
             // Downloads tab content
-            if (!allDownloaded) {
+            if (hasActiveDownloads) {
+                item {
+                    Button(
+                        onClick = onCancelAll,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    ) {
+                        Text("Cancel All")
+                    }
+                }
+            } else if (!allDownloaded) {
                 item {
                     Button(onClick = onDownloadAll, modifier = Modifier.fillMaxWidth()) {
                         Text("Download All")

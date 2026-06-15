@@ -7,7 +7,10 @@ import com.lycoris.noboundrift.data.local.LibraryPreferences
 import com.lycoris.noboundrift.data.local.entity.DownloadEntity
 import com.lycoris.noboundrift.data.local.entity.DownloadStatus
 import com.lycoris.noboundrift.domain.model.MangaPreview
+import com.lycoris.noboundrift.domain.repository.DownloadRepository
 import com.lycoris.noboundrift.domain.repository.MangaRepository
+import com.lycoris.noboundrift.domain.usecase.CancelAllDownloadsUseCase
+import com.lycoris.noboundrift.domain.usecase.DeleteDownloadUseCase
 import com.lycoris.noboundrift.domain.usecase.GetDownloadsUseCase
 import com.lycoris.noboundrift.domain.usecase.GetLibraryUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -46,6 +49,9 @@ class LibraryViewModel @Inject constructor(
     private val repository: MangaRepository,
     getDownloads: GetDownloadsUseCase,
     libraryPreferences: LibraryPreferences,
+    private val deleteDownloadUseCase: DeleteDownloadUseCase,
+    private val cancelAllDownloadsUseCase: CancelAllDownloadsUseCase,
+    private val downloadRepository: DownloadRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LibraryUiState())
@@ -122,5 +128,21 @@ class LibraryViewModel @Inject constructor(
                 activeReorderWrites--
             }
         }
+    }
+
+    fun cancelDownload(chapterUrl: String) {
+        viewModelScope.launch { downloadRepository.cancelDownload(chapterUrl) }
+    }
+
+    fun retryDownload(entity: DownloadEntity) {
+        viewModelScope.launch { downloadRepository.retryDownload(entity) }
+    }
+
+    fun deleteDownload(chapterUrl: String) {
+        viewModelScope.launch { deleteDownloadUseCase(chapterUrl) }
+    }
+
+    fun cancelAllDownloads(mangaId: String) {
+        viewModelScope.launch { cancelAllDownloadsUseCase(mangaId) }
     }
 }

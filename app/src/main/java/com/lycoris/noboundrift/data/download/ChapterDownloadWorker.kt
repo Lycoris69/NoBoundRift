@@ -32,8 +32,8 @@ class ChapterDownloadWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val sourceId = inputData.getLong(KEY_SOURCE_ID, -1L)
-        val chapterUrl = inputData.getString(KEY_CHAPTER_URL) ?: return@withContext Result.failure()
-        val localDir = inputData.getString(KEY_LOCAL_DIR) ?: return@withContext Result.failure()
+        val chapterUrl = inputData.getString(KEY_CHAPTER_URL) ?: return@withContext Result.success()
+        val localDir = inputData.getString(KEY_LOCAL_DIR) ?: return@withContext Result.success()
 
         downloadDao.updateStatus(chapterUrl, DownloadStatus.DOWNLOADING)
 
@@ -41,7 +41,7 @@ class ChapterDownloadWorker @AssistedInject constructor(
             val pages = sourceManager.getSource(sourceId).fetchPageList(chapterUrl)
             if (pages.isEmpty()) {
                 downloadDao.updateStatus(chapterUrl, DownloadStatus.FAILED)
-                return@withContext Result.failure()
+                return@withContext Result.success()
             }
 
             val dir = File(localDir).also { it.mkdirs() }
@@ -69,7 +69,7 @@ class ChapterDownloadWorker @AssistedInject constructor(
             Result.success()
         } catch (e: Exception) {
             downloadDao.updateStatus(chapterUrl, DownloadStatus.FAILED)
-            Result.failure()
+            Result.success()
         }
     }
 }

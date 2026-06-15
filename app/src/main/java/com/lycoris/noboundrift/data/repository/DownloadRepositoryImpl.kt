@@ -54,7 +54,9 @@ class DownloadRepositoryImpl @Inject constructor(
             queuedAt = System.currentTimeMillis(),
         )
         downloadDao.insert(entity)
-        enqueueWork(sourceId, normalizedUrl, localDir)
+        // Enqueue all QUEUED chapters for this manga so orphaned entries from a previously
+        // broken chain also get workers. KEEP policy means live workers are untouched.
+        enqueueQueuedChaptersForManga(mangaId)
     }
 
     override suspend fun queueAllChapters(
@@ -125,6 +127,18 @@ class DownloadRepositoryImpl @Inject constructor(
         downloadDao.updateStatus(normalized, DownloadStatus.FAILED)
     }
 
+    override suspend fun cancelAllDownloads(mangaId: String) {
+        workManager.cancelUniqueWork("manga_dl_${mangaId.hashCode()}")
+        val active = downloadDao.getActiveForManga(mangaId)
+        active.forEach { entity -> workManager.cancelUniqueWork(workTag(entity.chapterUrl)) }
+        downloadDao.cancelAllActive(mangaId)
+    }
+
+    override suspend fun retryDownload(entity: DownloadEntity) {
+        downloadDao.updateStatus(entity.chapterUrl, DownloadStatus.QUEUED)
+        enqueueQueuedChaptersForManga(entity.mangaId)
+    }
+
     override suspend fun deleteDownload(chapterUrl: String) {
         val normalized = chapterUrl.trimEnd('/')
         workManager.cancelUniqueWork(workTag(normalized))
@@ -158,6 +172,12 @@ class DownloadRepositoryImpl @Inject constructor(
                 Page(index = index, imageUrl = file.toURI().toString())
             }
             ?.takeIf { it.isNotEmpty() }
+    }
+
+    private suspend fun enqueueQueuedChaptersForManga(mangaId: String) {
+        downloadDao.getQueuedForManga(mangaId).forEach { entity ->
+            enqueueWork(entity.sourceId, entity.chapterUrl, entity.localDir)
+        }
     }
 
     private fun buildLocalDir(mangaId: String, chapter: Chapter): String {

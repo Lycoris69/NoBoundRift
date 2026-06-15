@@ -21,8 +21,13 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -46,6 +51,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.lycoris.noboundrift.data.local.LibraryLayout
+import com.lycoris.noboundrift.data.local.entity.DownloadEntity
+import com.lycoris.noboundrift.data.local.entity.DownloadStatus
 import com.lycoris.noboundrift.domain.model.MangaPreview
 import com.lycoris.noboundrift.presentation.common.MangaCard
 
@@ -85,7 +92,14 @@ fun LibraryScreen(
                 }
             }
             LibraryTab.DOWNLOADS -> {
-                DownloadsTab(groups = uiState.downloadGroups, onMangaClick = onMangaClick)
+                DownloadsTab(
+                    groups = uiState.downloadGroups,
+                    onMangaClick = onMangaClick,
+                    onCancelDownload = viewModel::cancelDownload,
+                    onRetryDownload = viewModel::retryDownload,
+                    onDeleteDownload = viewModel::deleteDownload,
+                    onCancelAll = viewModel::cancelAllDownloads,
+                )
             }
         }
     }
@@ -231,6 +245,10 @@ private fun LibraryList(
 private fun DownloadsTab(
     groups: List<MangaDownloadGroup>,
     onMangaClick: (MangaPreview) -> Unit,
+    onCancelDownload: (String) -> Unit,
+    onRetryDownload: (DownloadEntity) -> Unit,
+    onDeleteDownload: (String) -> Unit,
+    onCancelAll: (String) -> Unit,
 ) {
     if (groups.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -249,57 +267,153 @@ private fun DownloadsTab(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(groups, key = { it.mangaId }) { group ->
-                MangaDownloadGroupCard(group = group, onClick = {
-                    onMangaClick(
-                        MangaPreview(
-                            id = group.mangaId,
-                            title = group.mangaTitle,
-                            coverUrl = group.mangaCoverUrl,
-                            sourceId = group.sourceId,
-                            url = group.mangaUrl,
+                MangaDownloadGroupCard(
+                    group = group,
+                    onCancelDownload = onCancelDownload,
+                    onRetryDownload = onRetryDownload,
+                    onDeleteDownload = onDeleteDownload,
+                    onCancelAll = onCancelAll,
+                    onClick = {
+                        onMangaClick(
+                            MangaPreview(
+                                id = group.mangaId,
+                                title = group.mangaTitle,
+                                coverUrl = group.mangaCoverUrl,
+                                sourceId = group.sourceId,
+                                url = group.mangaUrl,
+                            )
                         )
-                    )
-                })
+                    },
+                )
             }
         }
     }
 }
 
 @Composable
-private fun MangaDownloadGroupCard(group: MangaDownloadGroup, onClick: () -> Unit) {
+private fun MangaDownloadGroupCard(
+    group: MangaDownloadGroup,
+    onCancelDownload: (String) -> Unit,
+    onRetryDownload: (DownloadEntity) -> Unit,
+    onDeleteDownload: (String) -> Unit,
+    onCancelAll: (String) -> Unit,
+    onClick: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val hasActive = group.chapters.any {
+        it.status == DownloadStatus.QUEUED || it.status == DownloadStatus.DOWNLOADING
+    }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            AsyncImage(
+                model = group.mangaCoverUrl,
+                contentDescription = group.mangaTitle,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(6.dp)),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = group.mangaTitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 2,
+                )
+                Text(
+                    text = "${group.completedCount} / ${group.totalCount} chapters downloaded",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (hasActive) {
+                IconButton(onClick = { onCancelAll(group.mangaId) }) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Cancel all",
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+            Icon(
+                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = if (expanded) "Collapse" else "Expand",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (expanded) {
+            group.chapters.forEach { entity ->
+                LibraryDownloadChapterRow(
+                    entity = entity,
+                    onCancel = { onCancelDownload(entity.chapterUrl) },
+                    onRetry = { onRetryDownload(entity) },
+                    onDelete = { onDeleteDownload(entity.chapterUrl) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LibraryDownloadChapterRow(
+    entity: DownloadEntity,
+    onCancel: () -> Unit,
+    onRetry: () -> Unit,
+    onDelete: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
+            .padding(start = 68.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        AsyncImage(
-            model = group.mangaCoverUrl,
-            contentDescription = group.mangaTitle,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(56.dp)
-                .clip(RoundedCornerShape(6.dp)),
-        )
         Column(modifier = Modifier.weight(1f)) {
+            Text(entity.chapterTitle, style = MaterialTheme.typography.bodySmall)
+            val sub = when (entity.status) {
+                DownloadStatus.QUEUED -> "Queued"
+                DownloadStatus.DOWNLOADING -> "${entity.downloadedPages} / ${entity.totalPages} pages"
+                DownloadStatus.COMPLETED -> "Downloaded"
+                DownloadStatus.FAILED -> "Failed"
+            }
             Text(
-                text = group.mangaTitle,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 2,
-            )
-            Text(
-                text = "${group.completedCount} / ${group.totalCount} chapters downloaded",
+                text = sub,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Icon(
-            imageVector = Icons.Default.ChevronRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        when (entity.status) {
+            DownloadStatus.QUEUED, DownloadStatus.DOWNLOADING ->
+                IconButton(onClick = onCancel) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Cancel",
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                }
+            DownloadStatus.FAILED ->
+                IconButton(onClick = onRetry) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Retry",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            DownloadStatus.COMPLETED ->
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+        }
     }
 }
 

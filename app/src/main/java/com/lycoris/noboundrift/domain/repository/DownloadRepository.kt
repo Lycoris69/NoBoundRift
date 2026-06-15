@@ -27,6 +27,10 @@ interface DownloadRepository {
 
     suspend fun cancelDownload(chapterUrl: String)
 
+    suspend fun cancelAllDownloads(mangaId: String)
+
+    suspend fun retryDownload(entity: DownloadEntity)
+
     suspend fun deleteDownload(chapterUrl: String)
 
     fun observeDownloadsForManga(mangaId: String): Flow<List<DownloadEntity>>
