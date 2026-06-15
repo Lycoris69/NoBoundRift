@@ -14,6 +14,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -25,6 +26,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lycoris.noboundrift.data.local.LibraryLayout
 import com.lycoris.noboundrift.data.local.PreloadMode
+import kotlin.math.roundToInt
 
 private val CACHE_SIZE_OPTIONS = listOf(
     64L * 1024 * 1024 to "64 MB",
@@ -117,6 +119,27 @@ fun SettingsScreen(
                 label = "List",
                 selected = uiState.libraryLayout == LibraryLayout.LIST,
                 onClick = { viewModel.setLibraryLayout(LibraryLayout.LIST) },
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Parallel Downloads",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+            Text(
+                text = "${uiState.downloadConcurrency} chapter${if (uiState.downloadConcurrency == 1) "" else "s"} at a time",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+            )
+            Slider(
+                value = uiState.downloadConcurrency.toFloat(),
+                onValueChange = { viewModel.setDownloadConcurrency(it.roundToInt()) },
+                valueRange = 1f..20f,
+                steps = 18,
+                modifier = Modifier.padding(horizontal = 16.dp),
             )
         }
     }

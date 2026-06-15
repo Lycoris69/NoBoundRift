@@ -22,8 +22,9 @@ Personal Android manga and webtoon reader. Content is sourced by scraping third-
 - User-friendly error screen with Retry instead of a crash
 - Image refresh button in the reader top bar to retry failed page loads
 - **Chapter downloads** — download chapters for offline reading in the background via WorkManager
-- **Download All** — queues every chapter sequentially (first to last) so they download one at a time
+- **Download All / Cancel All** — queues every chapter sequentially; button switches to Cancel All while downloads are active
 - **Downloads tab** in the library and detail screens to manage downloaded chapters
+- **Inline download controls in Library** — expand a manga group to cancel, retry, or delete individual chapters without leaving the library
 - **Offline fallback** — Detail screen builds from local downloads when the network is unavailable
 - Friendly offline error with WifiOff icon in Browse instead of a raw exception message
 - Refresh button in the Browse search bar to re-run the current search

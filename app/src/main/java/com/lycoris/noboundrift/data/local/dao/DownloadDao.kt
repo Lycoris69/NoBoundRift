@@ -45,6 +45,9 @@ interface DownloadDao {
     @Query("SELECT * FROM downloads WHERE mangaId = :mangaId AND (status = 'QUEUED' OR status = 'DOWNLOADING') ORDER BY chapterNumber ASC")
     suspend fun getActiveForManga(mangaId: String): List<DownloadEntity>
 
+    @Query("SELECT COUNT(*) FROM downloads WHERE mangaId = :mangaId AND status = 'DOWNLOADING'")
+    suspend fun getDownloadingCountForManga(mangaId: String): Int
+
     @Query("UPDATE downloads SET status = 'FAILED' WHERE mangaId = :mangaId AND (status = 'QUEUED' OR status = 'DOWNLOADING')")
     suspend fun cancelAllActive(mangaId: String)
 }

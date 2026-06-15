@@ -40,4 +40,6 @@ interface DownloadRepository {
     suspend fun getLocalPages(chapterUrl: String): List<Page>?
 
     suspend fun getCompletedDownloadsForMangaUrl(mangaUrl: String): List<DownloadEntity>
+
+    suspend fun scheduleNextForManga(mangaId: String)
 }

@@ -3,6 +3,7 @@ package com.lycoris.noboundrift.presentation.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lycoris.noboundrift.data.local.CachePreferences
+import com.lycoris.noboundrift.data.local.DownloadPreferences
 import com.lycoris.noboundrift.data.local.LibraryLayout
 import com.lycoris.noboundrift.data.local.LibraryPreferences
 import com.lycoris.noboundrift.data.local.PreloadMode
@@ -23,6 +24,7 @@ data class SettingsUiState(
     val cacheSizeBytes: Long = 128L * 1024 * 1024,
     val preloadMode: PreloadMode = PreloadMode.ALWAYS,
     val libraryLayout: LibraryLayout = LibraryLayout.GRID,
+    val downloadConcurrency: Int = DownloadPreferences.DEFAULT_CONCURRENCY,
 )
 
 @HiltViewModel
@@ -32,6 +34,7 @@ class SettingsViewModel @Inject constructor(
     private val cachePreferences: CachePreferences,
     private val readerPreferences: ReaderPreferences,
     private val libraryPreferences: LibraryPreferences,
+    private val downloadPreferences: DownloadPreferences,
 ) : ViewModel() {
 
     val uiState: StateFlow<SettingsUiState> = combine(
@@ -39,13 +42,15 @@ class SettingsViewModel @Inject constructor(
         cachePreferences.observeCacheSizeBytes(),
         readerPreferences.observePreloadMode(),
         libraryPreferences.observeLibraryLayout(),
-    ) { selectedId, cacheSizeBytes, preloadMode, libraryLayout ->
+        downloadPreferences.observeConcurrency(),
+    ) { selectedId, cacheSizeBytes, preloadMode, libraryLayout, concurrency ->
         SettingsUiState(
             sources = sourceManager.getAllSources().sortedBy { it.id },
             selectedSourceId = selectedId,
             cacheSizeBytes = cacheSizeBytes,
             preloadMode = preloadMode,
             libraryLayout = libraryLayout,
+            downloadConcurrency = concurrency,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -63,5 +68,9 @@ class SettingsViewModel @Inject constructor(
 
     fun setLibraryLayout(layout: LibraryLayout) {
         libraryPreferences.setLibraryLayout(layout)
+    }
+
+    fun setDownloadConcurrency(value: Int) {
+        downloadPreferences.setConcurrency(value)
     }
 }

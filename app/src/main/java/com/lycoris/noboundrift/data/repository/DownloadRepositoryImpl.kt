@@ -6,6 +6,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.lycoris.noboundrift.data.download.ChapterDownloadWorker
+import com.lycoris.noboundrift.data.local.DownloadPreferences
 import com.lycoris.noboundrift.data.local.dao.DownloadDao
 import com.lycoris.noboundrift.data.local.entity.DownloadEntity
 import com.lycoris.noboundrift.data.local.entity.DownloadStatus
@@ -22,6 +23,7 @@ import javax.inject.Singleton
 class DownloadRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val downloadDao: DownloadDao,
+    private val downloadPreferences: DownloadPreferences,
 ) : DownloadRepository {
 
     private val workManager = WorkManager.getInstance(context)
@@ -96,29 +98,7 @@ class DownloadRepositoryImpl @Inject constructor(
             )
         }
 
-        // Build a sequential WorkManager chain: chapter N starts only after chapter N-1 finishes
-        val requests = toDownload.map { chapter ->
-            val normalized = chapter.url.trimEnd('/')
-            val localDir = buildLocalDir(mangaId, chapter)
-            OneTimeWorkRequestBuilder<ChapterDownloadWorker>()
-                .setInputData(
-                    Data.Builder()
-                        .putLong(ChapterDownloadWorker.KEY_SOURCE_ID, sourceId)
-                        .putString(ChapterDownloadWorker.KEY_CHAPTER_URL, normalized)
-                        .putString(ChapterDownloadWorker.KEY_LOCAL_DIR, localDir)
-                        .build()
-                )
-                .build()
-        }
-
-        val chainName = "manga_dl_${mangaId.hashCode()}"
-        var continuation = workManager.beginUniqueWork(
-            chainName,
-            ExistingWorkPolicy.APPEND_OR_REPLACE,
-            requests.first(),
-        )
-        requests.drop(1).forEach { req -> continuation = continuation.then(req) }
-        continuation.enqueue()
+        enqueueQueuedChaptersForManga(mangaId)
     }
 
     override suspend fun cancelDownload(chapterUrl: String) {
@@ -175,8 +155,12 @@ class DownloadRepositoryImpl @Inject constructor(
     }
 
     private suspend fun enqueueQueuedChaptersForManga(mangaId: String) {
-        downloadDao.getQueuedForManga(mangaId).forEach { entity ->
-            enqueueWork(entity.sourceId, entity.chapterUrl, entity.localDir)
+        val limit = downloadPreferences.getConcurrency()
+        val downloading = downloadDao.getDownloadingCountForManga(mangaId)
+        val slots = (limit - downloading).coerceAtLeast(0)
+        if (slots <= 0) return
+        downloadDao.getQueuedForManga(mangaId).take(slots).forEach { entity ->
+            enqueueWork(entity.sourceId, entity.chapterUrl, entity.localDir, entity.mangaId)
         }
     }
 
@@ -189,11 +173,16 @@ class DownloadRepositoryImpl @Inject constructor(
 
     private fun workTag(normalizedUrl: String) = "download_${normalizedUrl.hashCode()}"
 
-    private fun enqueueWork(sourceId: Long, normalizedUrl: String, localDir: String) {
+    override suspend fun scheduleNextForManga(mangaId: String) {
+        enqueueQueuedChaptersForManga(mangaId)
+    }
+
+    private fun enqueueWork(sourceId: Long, normalizedUrl: String, localDir: String, mangaId: String) {
         val inputData = Data.Builder()
             .putLong(ChapterDownloadWorker.KEY_SOURCE_ID, sourceId)
             .putString(ChapterDownloadWorker.KEY_CHAPTER_URL, normalizedUrl)
             .putString(ChapterDownloadWorker.KEY_LOCAL_DIR, localDir)
+            .putString(ChapterDownloadWorker.KEY_MANGA_ID, mangaId)
             .build()
         val request = OneTimeWorkRequestBuilder<ChapterDownloadWorker>()
             .setInputData(inputData)

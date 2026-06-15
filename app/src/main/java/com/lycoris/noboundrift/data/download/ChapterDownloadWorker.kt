@@ -7,6 +7,7 @@ import androidx.work.WorkerParameters
 import com.lycoris.noboundrift.data.local.dao.DownloadDao
 import com.lycoris.noboundrift.data.local.entity.DownloadStatus
 import com.lycoris.noboundrift.data.remote.source.SourceManager
+import com.lycoris.noboundrift.domain.repository.DownloadRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.Dispatchers
@@ -22,18 +23,21 @@ class ChapterDownloadWorker @AssistedInject constructor(
     private val sourceManager: SourceManager,
     private val downloadDao: DownloadDao,
     private val okHttpClient: OkHttpClient,
+    private val downloadRepository: DownloadRepository,
 ) : CoroutineWorker(context, params) {
 
     companion object {
         const val KEY_SOURCE_ID = "sourceId"
         const val KEY_CHAPTER_URL = "chapterUrl"
         const val KEY_LOCAL_DIR = "localDir"
+        const val KEY_MANGA_ID = "mangaId"
     }
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val sourceId = inputData.getLong(KEY_SOURCE_ID, -1L)
         val chapterUrl = inputData.getString(KEY_CHAPTER_URL) ?: return@withContext Result.success()
         val localDir = inputData.getString(KEY_LOCAL_DIR) ?: return@withContext Result.success()
+        val mangaId = inputData.getString(KEY_MANGA_ID) ?: ""
 
         downloadDao.updateStatus(chapterUrl, DownloadStatus.DOWNLOADING)
 
@@ -41,6 +45,7 @@ class ChapterDownloadWorker @AssistedInject constructor(
             val pages = sourceManager.getSource(sourceId).fetchPageList(chapterUrl)
             if (pages.isEmpty()) {
                 downloadDao.updateStatus(chapterUrl, DownloadStatus.FAILED)
+                if (mangaId.isNotEmpty()) downloadRepository.scheduleNextForManga(mangaId)
                 return@withContext Result.success()
             }
 
@@ -66,10 +71,11 @@ class ChapterDownloadWorker @AssistedInject constructor(
             }
 
             downloadDao.updateStatus(chapterUrl, DownloadStatus.COMPLETED)
-            Result.success()
         } catch (e: Exception) {
             downloadDao.updateStatus(chapterUrl, DownloadStatus.FAILED)
-            Result.success()
         }
+
+        if (mangaId.isNotEmpty()) downloadRepository.scheduleNextForManga(mangaId)
+        Result.success()
     }
 }
