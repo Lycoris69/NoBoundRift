@@ -185,6 +185,13 @@ private fun BrowseGrid(
 ) {
     val gridState = rememberLazyGridState()
 
+    // Scroll back to top whenever a fresh page-1 result set arrives.
+    LaunchedEffect(uiState.manga.firstOrNull()?.id) {
+        if (uiState.currentPage == 1 && uiState.manga.isNotEmpty()) {
+            gridState.scrollToItem(0)
+        }
+    }
+
     // Trigger pagination when the user scrolls near the bottom
     LaunchedEffect(gridState) {
         snapshotFlow { gridState.layoutInfo }

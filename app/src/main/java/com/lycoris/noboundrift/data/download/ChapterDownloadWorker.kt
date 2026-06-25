@@ -10,6 +10,7 @@ import com.lycoris.noboundrift.data.remote.source.SourceManager
 import com.lycoris.noboundrift.domain.repository.DownloadRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -60,10 +61,11 @@ class ChapterDownloadWorker @AssistedInject constructor(
                         .apply { page.refererUrl?.let { addHeader("Referer", it) } }
                         .build()
                     okHttpClient.newCall(request).execute().use { response ->
-                        if (response.isSuccessful) {
-                            response.body?.byteStream()?.use { input ->
-                                file.outputStream().use { output -> input.copyTo(output) }
-                            }
+                        if (!response.isSuccessful) {
+                            throw IllegalStateException("HTTP ${response.code} fetching ${page.imageUrl}")
+                        }
+                        response.body?.byteStream()?.use { input ->
+                            file.outputStream().use { output -> input.copyTo(output) }
                         }
                     }
                 }
@@ -72,6 +74,7 @@ class ChapterDownloadWorker @AssistedInject constructor(
 
             downloadDao.updateStatus(chapterUrl, DownloadStatus.COMPLETED)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             downloadDao.updateStatus(chapterUrl, DownloadStatus.FAILED)
         }
 

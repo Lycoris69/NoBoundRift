@@ -103,7 +103,8 @@ class BrowseViewModel @Inject constructor(
         searchJob?.cancel()
         loadJob?.cancel()
         crossSourceJob?.cancel()
-        _uiState.update { it.copy(manga = emptyList(), currentPage = 1, canLoadMore = true, error = null) }
+        enrichJob?.cancel()
+        _uiState.update { it.copy(manga = emptyList(), currentPage = 1, canLoadMore = true, error = null, isLoading = false, isLoadingMore = false) }
         loadPage(page = 1)
     }
 
@@ -126,6 +127,7 @@ class BrowseViewModel @Inject constructor(
         searchJob?.cancel()
         loadJob?.cancel()
         crossSourceJob?.cancel()
+        enrichJob?.cancel()
         searchJob = viewModelScope.launch {
             delay(400)
             loadPage(page = 1)

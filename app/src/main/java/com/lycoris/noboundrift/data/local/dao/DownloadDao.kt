@@ -39,8 +39,8 @@ interface DownloadDao {
     @Query("SELECT * FROM downloads WHERE (mangaUrl = :mangaUrl OR mangaUrl = :mangaUrlTrailing) AND status = 'COMPLETED' ORDER BY chapterNumber ASC")
     suspend fun getCompletedByMangaUrl(mangaUrl: String, mangaUrlTrailing: String): List<DownloadEntity>
 
-    @Query("SELECT * FROM downloads WHERE mangaId = :mangaId AND status = 'QUEUED' ORDER BY chapterNumber ASC")
-    suspend fun getQueuedForManga(mangaId: String): List<DownloadEntity>
+    @Query("SELECT * FROM downloads WHERE mangaId = :mangaId AND status = 'QUEUED' ORDER BY chapterNumber ASC LIMIT :limit")
+    suspend fun getQueuedForManga(mangaId: String, limit: Int): List<DownloadEntity>
 
     @Query("SELECT * FROM downloads WHERE mangaId = :mangaId AND (status = 'QUEUED' OR status = 'DOWNLOADING') ORDER BY chapterNumber ASC")
     suspend fun getActiveForManga(mangaId: String): List<DownloadEntity>

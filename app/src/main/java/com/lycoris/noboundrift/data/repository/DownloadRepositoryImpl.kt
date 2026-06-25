@@ -159,7 +159,7 @@ class DownloadRepositoryImpl @Inject constructor(
         val downloading = downloadDao.getDownloadingCountForManga(mangaId)
         val slots = (limit - downloading).coerceAtLeast(0)
         if (slots <= 0) return
-        downloadDao.getQueuedForManga(mangaId).take(slots).forEach { entity ->
+        downloadDao.getQueuedForManga(mangaId, slots).forEach { entity ->
             enqueueWork(entity.sourceId, entity.chapterUrl, entity.localDir, entity.mangaId)
         }
     }
