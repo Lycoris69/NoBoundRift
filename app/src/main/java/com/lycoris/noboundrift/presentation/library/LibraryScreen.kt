@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -82,7 +84,7 @@ fun LibraryScreen(
                 if (uiState.isEmpty) {
                     EmptyLibrary()
                 } else if (uiState.libraryLayout == LibraryLayout.LIST) {
-                    LibraryList(uiState = uiState, onMangaClick = onMangaClick)
+                    LibraryList(uiState = uiState, onMangaClick = onMangaClick, viewModel = viewModel)
                 } else {
                     LibraryGrid(
                         uiState = uiState,
@@ -144,7 +146,7 @@ private fun LibraryGrid(
                             shadowElevation = 16f
                         }
                     }
-                    .pointerInput(index) {
+                    .pointerInput(preview.id) {
                         detectDragGesturesAfterLongPress(
                             onDragStart = { offsetWithinItem ->
                                 // Compute the touch position in the grid's scroll viewport
@@ -192,18 +194,65 @@ private fun LibraryGrid(
 private fun LibraryList(
     uiState: LibraryUiState,
     onMangaClick: (MangaPreview) -> Unit,
+    viewModel: LibraryViewModel,
 ) {
+    val listState = rememberLazyListState()
+    var draggingIndex by remember { mutableStateOf<Int?>(null) }
+    var touchYInViewport by remember { mutableStateOf(0f) }
+
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 4.dp),
     ) {
-        items(uiState.manga, key = { it.id }) { preview ->
-            val isNew = preview.latestChapterAt > System.currentTimeMillis() - NEW_CHAPTER_WINDOW_MS
+        itemsIndexed(uiState.manga, key = { _, preview -> preview.id }) { index, preview ->
+            val isDragging = draggingIndex == index
+            val isNew = !isDragging && preview.latestChapterAt > System.currentTimeMillis() - NEW_CHAPTER_WINDOW_MS
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onMangaClick(preview) }
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .zIndex(if (isDragging) 1f else 0f)
+                    .graphicsLayer {
+                        if (isDragging) {
+                            scaleX = 1.03f
+                            scaleY = 1.03f
+                            shadowElevation = 8f
+                        }
+                    }
+                    .clickable { if (draggingIndex == null) onMangaClick(preview) }
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .pointerInput(preview.id) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { offsetWithinItem ->
+                                val itemInfo = listState.layoutInfo.visibleItemsInfo
+                                    .firstOrNull { it.index == index }
+                                if (itemInfo != null) {
+                                    draggingIndex = index
+                                    touchYInViewport = itemInfo.offset + offsetWithinItem.y
+                                }
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                touchYInViewport += dragAmount.y
+                                val currentDragging = draggingIndex ?: return@detectDragGesturesAfterLongPress
+                                val target = listState.layoutInfo.visibleItemsInfo.firstOrNull { info ->
+                                    touchYInViewport >= info.offset && touchYInViewport < info.offset + info.size
+                                }
+                                if (target != null && target.index != currentDragging) {
+                                    viewModel.onMove(currentDragging, target.index)
+                                    draggingIndex = target.index
+                                }
+                            },
+                            onDragEnd = {
+                                draggingIndex = null
+                                viewModel.onDragEnd()
+                            },
+                            onDragCancel = {
+                                draggingIndex = null
+                                viewModel.onDragEnd()
+                            },
+                        )
+                    },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
