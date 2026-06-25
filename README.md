@@ -16,7 +16,8 @@ Personal Android manga and webtoon reader. Content is sourced by scraping third-
 - **Continue Reading** — resumes the exact chapter you were on when you last exited
 - Chapter marked as read automatically at 80%+ progress
 - Local library — bookmark titles and track reading progress
-- **Drag-to-reorder library** — long-press a cover then drag to reposition it (grid mode only)
+- **Drag-to-reorder library** — long-press a cover then drag to reposition it (grid and list modes)
+- **NEW badge + auto-sort** — manga with a chapter released in the last 7 days are marked NEW and float to the top of the library automatically
 - **Library layout setting** — switch between grid and list view in Settings
 - Lock icon on premium/paywalled chapters
 - User-friendly error screen with Retry instead of a crash
