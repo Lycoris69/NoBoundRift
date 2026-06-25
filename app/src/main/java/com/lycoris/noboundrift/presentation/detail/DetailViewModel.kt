@@ -167,7 +167,8 @@ class DetailViewModel @Inject constructor(
                     else emptyChapterCache.unmark(manga.id)
                     val latestAt = chapters.maxOfOrNull { it.dateUpload } ?: 0L
                     if (latestAt > 0L) {
-                        launch { repository.updateLatestChapterAt(manga.id, latestAt) }
+                        val latestUrl = chapters.maxByOrNull { it.dateUpload }?.url?.trimEnd('/') ?: ""
+                        launch { repository.updateLatestChapterAt(manga.id, latestAt, latestUrl) }
                     }
 
                     startObservers(manga.id)

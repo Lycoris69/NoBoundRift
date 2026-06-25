@@ -12,6 +12,7 @@ import com.lycoris.noboundrift.domain.repository.DownloadRepository
 import com.lycoris.noboundrift.domain.repository.MangaRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -65,7 +66,12 @@ class MangaRepositoryImpl @Inject constructor(
     // ── Library (Room-backed) ─────────────────────────────────────────────────
 
     override fun getLibrary(): Flow<List<MangaPreview>> =
-        mangaDao.observeAll().map { entities -> entities.map { it.toPreview() } }
+        combine(
+            mangaDao.observeAll(),
+            chapterDao.observeAllReadUrls(),
+        ) { entities, readUrlList ->
+            entities.map { it.toPreview(readUrlList.toHashSet()) }
+        }
 
     override suspend fun addToLibrary(manga: MangaPreview) {
         val now = System.currentTimeMillis()
@@ -89,8 +95,8 @@ class MangaRepositoryImpl @Inject constructor(
     override fun isInLibrary(mangaId: String): Flow<Boolean> =
         mangaDao.observeExists(mangaId)
 
-    override suspend fun updateLatestChapterAt(mangaId: String, latestAt: Long) {
-        mangaDao.updateLatestChapterAt(mangaId, latestAt)
+    override suspend fun updateLatestChapterAt(mangaId: String, latestAt: Long, latestChapterUrl: String) {
+        mangaDao.updateLatestChapterAt(mangaId, latestAt, latestChapterUrl)
     }
 
     override suspend fun getLatestChapterDates(ids: List<String>): Map<String, Long> =
@@ -137,13 +143,14 @@ class MangaRepositoryImpl @Inject constructor(
 
     // ── Mappers ───────────────────────────────────────────────────────────────
 
-    private fun MangaEntity.toPreview() = MangaPreview(
+    private fun MangaEntity.toPreview(readUrls: Set<String> = emptySet()) = MangaPreview(
         id = id,
         title = title,
         coverUrl = coverUrl,
         sourceId = sourceId,
         url = url,
         latestChapterAt = latestChapterAt,
+        isLatestChapterRead = latestChapterUrl.isNotEmpty() && latestChapterUrl in readUrls,
     )
 
 }

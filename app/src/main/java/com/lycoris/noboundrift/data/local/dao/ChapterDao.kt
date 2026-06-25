@@ -76,4 +76,7 @@ interface ChapterDao {
 
     @Query("UPDATE chapter_progress SET read = 0 WHERE chapterUrl = :url")
     suspend fun markUnread(url: String)
+
+    @Query("SELECT chapterUrl FROM chapter_progress WHERE read = 1")
+    fun observeAllReadUrls(): Flow<List<String>>
 }

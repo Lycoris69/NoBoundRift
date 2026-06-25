@@ -70,7 +70,7 @@ class LibraryViewModel @Inject constructor(
             getLibrary().collect { list ->
                 if (!suppressDbUpdates) {
                     val sorted = list.sortedByDescending {
-                        it.latestChapterAt > System.currentTimeMillis() - 7L * 24 * 3600 * 1000
+                        it.latestChapterAt > System.currentTimeMillis() - 7L * 24 * 3600 * 1000 && !it.isLatestChapterRead
                     }
                     _uiState.update { current ->
                         current.copy(manga = sorted, isEmpty = sorted.isEmpty())

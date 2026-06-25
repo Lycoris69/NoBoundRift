@@ -13,5 +13,6 @@ data class MangaEntity(
     val url: String,
     val addedAt: Long = System.currentTimeMillis(),
     val latestChapterAt: Long = 0L,
+    val latestChapterUrl: String = "",
     val sortOrder: Long = 0L,
 )

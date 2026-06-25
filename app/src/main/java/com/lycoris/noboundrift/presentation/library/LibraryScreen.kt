@@ -135,7 +135,7 @@ private fun LibraryGrid(
                 preview = preview,
                 onClick = { if (draggingIndex == null) onMangaClick(preview) },
                 showNewBadge = !isDragging &&
-                    preview.latestChapterAt > System.currentTimeMillis() - NEW_CHAPTER_WINDOW_MS,
+                    preview.latestChapterAt > System.currentTimeMillis() - NEW_CHAPTER_WINDOW_MS && !preview.isLatestChapterRead,
                 modifier = Modifier
                     .animateItem()
                     .zIndex(if (isDragging) 1f else 0f)
@@ -207,7 +207,7 @@ private fun LibraryList(
     ) {
         itemsIndexed(uiState.manga, key = { _, preview -> preview.id }) { index, preview ->
             val isDragging = draggingIndex == index
-            val isNew = !isDragging && preview.latestChapterAt > System.currentTimeMillis() - NEW_CHAPTER_WINDOW_MS
+            val isNew = !isDragging && preview.latestChapterAt > System.currentTimeMillis() - NEW_CHAPTER_WINDOW_MS && !preview.isLatestChapterRead
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

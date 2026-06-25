@@ -30,7 +30,7 @@ interface MangaRepository {
 
     fun isInLibrary(mangaId: String): Flow<Boolean>
 
-    suspend fun updateLatestChapterAt(mangaId: String, latestAt: Long)
+    suspend fun updateLatestChapterAt(mangaId: String, latestAt: Long, latestChapterUrl: String)
 
     /**
      * Returns a map of manga ID → latestChapterAt for all [ids] that have a stored
