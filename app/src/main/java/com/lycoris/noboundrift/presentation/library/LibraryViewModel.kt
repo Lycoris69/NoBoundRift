@@ -17,6 +17,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -64,6 +65,7 @@ class LibraryViewModel @Inject constructor(
     private var activeReorderWrites = 0
     private val suppressDbUpdates get() = activeReorderWrites > 0
     private var reorderJob: Job? = null
+    private var refreshJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -104,6 +106,27 @@ class LibraryViewModel @Inject constructor(
                     }
                     .sortedBy { it.mangaTitle }
                 _uiState.update { it.copy(downloadGroups = groups) }
+            }
+        }
+
+        refreshLatestChapters()
+    }
+
+    private fun refreshLatestChapters() {
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch {
+            val library = _uiState.first { it.manga.isNotEmpty() }.manga
+            library.forEach { preview ->
+                launch {
+                    repository.fetchChapterList(preview.sourceId, preview.url)
+                        .onSuccess { chapters ->
+                            if (chapters.isEmpty()) return@onSuccess
+                            val latestUrl = chapters.last().url.trimEnd('/')
+                            if (latestUrl == preview.latestChapterUrl) return@onSuccess
+                            val latestAt = chapters.maxOfOrNull { it.dateUpload } ?: 0L
+                            repository.updateLatestChapterAt(preview.id, latestAt, latestUrl)
+                        }
+                }
             }
         }
     }

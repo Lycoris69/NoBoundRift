@@ -335,11 +335,17 @@ private fun PageImage(page: Page, imageRetryKey: Int, modifier: Modifier = Modif
             // chapter even starts decoding. The 512 MB disk cache is fast enough to
             // re-decode on re-scroll without the OOM risk.
             .memoryCachePolicy(CachePolicy.DISABLED)
+            // On retry, skip reading the disk cache so we always hit the network fresh.
+            // Normal first loads still read from disk (fast revisit after chapter jump).
+            .diskCachePolicy(if (imageRetryKey > 0) CachePolicy.WRITE_ONLY else CachePolicy.ENABLED)
             .apply {
                 page.refererUrl?.let { addHeader("Referer", it) }
             }
             .build()
     }
+    // key() forces the AsyncImagePainter to be fully discarded and recreated on retry,
+    // bypassing any internal Coil state that would short-circuit back to the error state.
+    key(imageRetryKey) {
     SubcomposeAsyncImage(
         model = model,
         contentDescription = "Page ${page.index + 1}",
@@ -390,6 +396,7 @@ private fun PageImage(page: Page, imageRetryKey: Int, modifier: Modifier = Modif
             }
         },
     )
+    } // key(imageRetryKey)
 }
 
 // ── Chrome overlay ────────────────────────────────────────────────────────

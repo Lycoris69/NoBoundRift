@@ -150,6 +150,7 @@ class MangaRepositoryImpl @Inject constructor(
         sourceId = sourceId,
         url = url,
         latestChapterAt = latestChapterAt,
+        latestChapterUrl = latestChapterUrl,
         isLatestChapterRead = latestChapterUrl.isNotEmpty() && latestChapterUrl in readUrls,
     )
 
