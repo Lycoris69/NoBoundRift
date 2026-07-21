@@ -26,6 +26,13 @@ import java.util.Locale
  */
 abstract class BaseHttpSource(protected val okHttpClient: OkHttpClient) : Source {
 
+    companion object {
+        private val RELATIVE_DATE_REGEX = Regex(
+            "(\\d+)\\s+(second|sec|minute|min|hour|day|week|month|year)s?\\s+ago",
+            RegexOption.IGNORE_CASE,
+        )
+    }
+
     // -------------------------------------------------------------------------
     // HTTP helpers
     // -------------------------------------------------------------------------
@@ -98,12 +105,12 @@ abstract class BaseHttpSource(protected val okHttpClient: OkHttpClient) : Source
                 .toEpochMilli()
         }.onSuccess { return it }
 
-        // Fall back to relative expression: "X mins/hours/days/weeks/months/years ago"
-        val match = Regex("(\\d+)\\s+(min|hour|day|week|month|year)s?\\s+ago", RegexOption.IGNORE_CASE)
-            .find(text) ?: return 0L
+        // Fall back to relative expression: "X secs/mins/hours/days/weeks/months/years ago"
+        val match = RELATIVE_DATE_REGEX.find(text) ?: return 0L
         val amount = match.groupValues[1].toLong()
         val unitMs = when (match.groupValues[2].lowercase(Locale.ROOT)) {
-            "min"   -> 60_000L
+            "second", "sec" -> 1_000L
+            "minute", "min" -> 60_000L
             "hour"  -> 3_600_000L
             "day"   -> 86_400_000L
             "week"  -> 7 * 86_400_000L

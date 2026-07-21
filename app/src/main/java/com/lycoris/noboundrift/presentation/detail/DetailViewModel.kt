@@ -21,6 +21,8 @@ import com.lycoris.noboundrift.presentation.navigation.decodeFromNav
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -168,7 +170,7 @@ class DetailViewModel @Inject constructor(
                     val latestAt = chapters.maxOfOrNull { it.dateUpload } ?: 0L
                     if (latestAt > 0L) {
                         val latestUrl = chapters.last().url.trimEnd('/')
-                        launch { repository.updateLatestChapterAt(manga.id, latestAt, latestUrl) }
+                        launch { withContext(NonCancellable) { repository.updateLatestChapterAt(manga.id, latestAt, latestUrl) } }
                     }
 
                     startObservers(manga.id)

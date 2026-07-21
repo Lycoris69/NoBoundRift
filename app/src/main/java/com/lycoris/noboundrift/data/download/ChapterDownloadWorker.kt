@@ -12,6 +12,7 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -46,7 +47,6 @@ class ChapterDownloadWorker @AssistedInject constructor(
             val pages = sourceManager.getSource(sourceId).fetchPageList(chapterUrl)
             if (pages.isEmpty()) {
                 downloadDao.updateStatus(chapterUrl, DownloadStatus.FAILED)
-                if (mangaId.isNotEmpty()) downloadRepository.scheduleNextForManga(mangaId)
                 return@withContext Result.success()
             }
 
@@ -64,7 +64,9 @@ class ChapterDownloadWorker @AssistedInject constructor(
                         if (!response.isSuccessful) {
                             throw IllegalStateException("HTTP ${response.code} fetching ${page.imageUrl}")
                         }
-                        response.body?.byteStream()?.use { input ->
+                        val body = response.body
+                            ?: throw IllegalStateException("Empty body for ${page.imageUrl}")
+                        body.byteStream().use { input ->
                             file.outputStream().use { output -> input.copyTo(output) }
                         }
                     }
@@ -76,9 +78,11 @@ class ChapterDownloadWorker @AssistedInject constructor(
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             downloadDao.updateStatus(chapterUrl, DownloadStatus.FAILED)
+        } finally {
+            withContext(NonCancellable) {
+                if (mangaId.isNotEmpty()) downloadRepository.scheduleNextForManga(mangaId)
+            }
         }
-
-        if (mangaId.isNotEmpty()) downloadRepository.scheduleNextForManga(mangaId)
         Result.success()
     }
 }

@@ -13,6 +13,7 @@ import com.lycoris.noboundrift.domain.repository.MangaRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -68,7 +69,7 @@ class MangaRepositoryImpl @Inject constructor(
     override fun getLibrary(): Flow<List<MangaPreview>> =
         combine(
             mangaDao.observeAll(),
-            chapterDao.observeAllReadUrls(),
+            chapterDao.observeAllReadUrls().distinctUntilChanged(),
         ) { entities, readUrlList ->
             entities.map { it.toPreview(readUrlList.toHashSet()) }
         }
