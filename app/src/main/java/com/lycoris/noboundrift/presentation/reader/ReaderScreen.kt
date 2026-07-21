@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -42,7 +43,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -57,6 +60,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -213,6 +217,14 @@ private fun WebtoonReader(
 ) {
     val listState = rememberLazyListState()
 
+    // Maps page.index → the display height (in dp) of that page when it was last successfully
+    // decoded. Used to give the loading placeholder the same height as the loaded image so
+    // that the LazyColumn never sees a height change when Coil transitions loading↔success.
+    // Keyed by page.index (stable for the lifetime of this WebtoonReader instance).
+    // mutableStateMapOf is read inside itemsIndexed, so writing to it (on decode success)
+    // automatically recomposes only the affected item.
+    val knownHeights = remember { mutableStateMapOf<Int, Dp>() }
+
     // Track the page whose midpoint is closest to the viewport center.
     // Using firstVisibleItemIndex is unreliable when off-screen items are evicted and
     // collapse to zero height before re-measuring, which causes spurious backward jumps.
@@ -248,6 +260,8 @@ private fun WebtoonReader(
             PageImage(
                 page = page,
                 imageRetryKey = imageRetryKey,
+                knownHeight = knownHeights[page.index],
+                onHeightKnown = { h -> knownHeights[page.index] = h },
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -309,10 +323,21 @@ private fun PageFlipReader(
 // ── Shared page image ─────────────────────────────────────────────────────
 
 @Composable
-private fun PageImage(page: Page, imageRetryKey: Int, modifier: Modifier = Modifier) {
+private fun PageImage(
+    page: Page,
+    imageRetryKey: Int,
+    knownHeight: Dp? = null,
+    onHeightKnown: ((Dp) -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
+
+    // rememberUpdatedState lets the ImageRequest listener (inside `remember`) always call the
+    // current onHeightKnown lambda without adding it to the remember key (which would rebuild
+    // the ImageRequest and restart the download every time the parent recomposes).
+    val onHeightKnownState = rememberUpdatedState(onHeightKnown)
 
     // Decode at exactly screen width. For images narrower than the screen (e.g. 800 px webtoon
     // strips on a 1080 px display) inSampleSize stays 1 — no width reduction, no blur.
@@ -335,6 +360,21 @@ private fun PageImage(page: Page, imageRetryKey: Int, modifier: Modifier = Modif
             // chapter even starts decoding. The 512 MB disk cache is fast enough to
             // re-decode on re-scroll without the OOM risk.
             .memoryCachePolicy(CachePolicy.DISABLED)
+            // Once a page decodes successfully, record its display height (screen-width × aspect
+            // ratio). On subsequent loads from disk (memory cache is disabled, so every scroll-
+            // back re-triggers a load) the placeholder will use this stored height, eliminating
+            // the height oscillation that was causing the LazyColumn to shift the viewport.
+            // Coil calls this listener on the main thread, so writing to a SnapshotStateMap here
+            // is safe.
+            .listener(onSuccess = { _, result ->
+                val drawable = result.drawable
+                val intrinsicW = drawable.intrinsicWidth
+                val intrinsicH = drawable.intrinsicHeight
+                if (intrinsicW > 0 && intrinsicH > 0) {
+                    val displayHeightPx = screenWidthPx.toFloat() * intrinsicH / intrinsicW
+                    onHeightKnownState.value?.invoke(with(density) { displayHeightPx.toDp() })
+                }
+            })
             .apply {
                 page.refererUrl?.let { addHeader("Referer", it) }
             }
@@ -350,14 +390,17 @@ private fun PageImage(page: Page, imageRetryKey: Int, modifier: Modifier = Modif
         modifier = modifier,
         loading = {
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    // Fixed minimum height keeps the placeholder tall enough that the
-                    // LazyColumn does not collapse items when they are evicted from the
-                    // Coil memory cache (disabled) and must re-decode from disk. Without
-                    // this, collapsing placeholders shift firstVisibleItemIndex and cause
-                    // the chapter indicator to jump back. Also spaces out the spinners.
-                    .heightIn(min = 600.dp),
+                // Use the last known decoded height so the placeholder is exactly the same
+                // size as the loaded image. This prevents any layout shift when Coil
+                // transitions between loading and success states — the LazyColumn never
+                // sees a height change and therefore never snaps the scroll position.
+                // Falls back to heightIn(min = 600.dp) only for pages that have never
+                // loaded before in this session (first visit, no cached height yet).
+                modifier = if (knownHeight != null) {
+                    Modifier.fillMaxWidth().height(knownHeight)
+                } else {
+                    Modifier.fillMaxWidth().heightIn(min = 600.dp)
+                },
                 contentAlignment = Alignment.Center,
             ) {
                 CircularProgressIndicator(color = Color.White)
