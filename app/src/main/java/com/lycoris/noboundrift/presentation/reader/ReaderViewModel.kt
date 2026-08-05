@@ -13,6 +13,7 @@ import com.lycoris.noboundrift.domain.model.Page
 import com.lycoris.noboundrift.domain.repository.MangaRepository
 import com.lycoris.noboundrift.domain.usecase.GetChapterListUseCase
 import com.lycoris.noboundrift.domain.usecase.GetChapterPagesUseCase
+import com.lycoris.noboundrift.domain.usecase.GetDownloadsUseCase
 import com.lycoris.noboundrift.domain.usecase.MarkChapterReadUseCase
 import com.lycoris.noboundrift.presentation.navigation.Screen
 import com.lycoris.noboundrift.presentation.navigation.decodeFromNav
@@ -54,6 +55,7 @@ class ReaderViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getChapterPages: GetChapterPagesUseCase,
     private val getChapterList: GetChapterListUseCase,
+    private val getDownloads: GetDownloadsUseCase,
     private val markChapterRead: MarkChapterReadUseCase,
     private val repository: MangaRepository,
     @ApplicationContext private val appContext: Context,
@@ -293,6 +295,37 @@ class ReaderViewModel @Inject constructor(
                 }
                 .onFailure { throwable ->
                     if (throwable is CancellationException) throw throwable
+                    // Network unavailable — build sortedChapters from completed local downloads so
+                    // that onExitReader() can mark chapters read and auto-load can still advance.
+                    val downloaded = getDownloads.forMangaUrl(mangaUrl)
+                    if (downloaded.isEmpty()) return@launch
+                    sortedChapters = downloaded
+                        .sortedBy { it.chapterNumber }
+                        .map { entity ->
+                            Chapter(
+                                id = entity.chapterUrl,
+                                mangaId = entity.mangaId,
+                                title = entity.chapterTitle,
+                                number = entity.chapterNumber,
+                                url = entity.chapterUrl,
+                            )
+                        }
+                    nextChapterUrl = findNextAfter(currentChapterUrl)
+                    _uiState.update {
+                        it.copy(
+                            canGoToPrevChapter = findPrevBefore(currentChapterUrl) != null,
+                            canGoToNextChapter = findNextAfter(currentChapterUrl) != null,
+                            currentChapterTitle = chapterTitleFor(currentChapterUrl),
+                        )
+                    }
+                    val state = _uiState.value
+                    if (nextChapterUrl != null &&
+                        state.pages.isNotEmpty() &&
+                        !state.isLoadingNextChapter &&
+                        state.currentPageIndex >= state.pages.size - 3
+                    ) {
+                        onNearEnd()
+                    }
                 }
         }
     }
