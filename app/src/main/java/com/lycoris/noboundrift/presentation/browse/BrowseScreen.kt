@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.Button
@@ -33,7 +34,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +57,24 @@ fun BrowseScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val allSourceNames = viewModel.allSourceNames
+
+    // Show the CF bypass dialog automatically when Manhwaz times out; the user can also
+    // re-open it manually via the button in ErrorState.
+    var showCfDialog by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(uiState.needsCfBypass) {
+        if (uiState.needsCfBypass) showCfDialog = true
+    }
+    if (showCfDialog) {
+        CloudflareWebViewDialog(
+            targetUrl = "https://manhwaz.com",
+            host = "manhwaz.com",
+            onSuccess = {
+                showCfDialog = false
+                viewModel.onCfBypassResolved()
+            },
+            onDismiss = { showCfDialog = false },
+        )
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         if (uiState.isDiscoverMode) {
@@ -78,7 +100,9 @@ fun BrowseScreen(
             uiState.error != null && uiState.manga.isEmpty() -> {
                 ErrorState(
                     message = uiState.error!!,
+                    needsCfBypass = uiState.needsCfBypass,
                     onRetry = viewModel::retry,
+                    onOpenCfDialog = { showCfDialog = true },
                 )
             }
 
@@ -292,7 +316,12 @@ private fun DateSectionHeader(title: String) {
 }
 
 @Composable
-private fun ErrorState(message: String, onRetry: () -> Unit) {
+private fun ErrorState(
+    message: String,
+    needsCfBypass: Boolean,
+    onRetry: () -> Unit,
+    onOpenCfDialog: () -> Unit,
+) {
     val isOffline = message == "No internet connection" || message == "Connection timed out"
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -303,7 +332,26 @@ private fun ErrorState(message: String, onRetry: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.padding(32.dp),
         ) {
-            if (isOffline) {
+            if (needsCfBypass) {
+                Icon(
+                    imageVector = Icons.Default.Security,
+                    contentDescription = null,
+                    modifier = Modifier.size(56.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "Cloudflare challenge required",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Tap the button below to solve the challenge in a browser, then the page will reload automatically.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.size(4.dp))
+                Button(onClick = onOpenCfDialog) { Text("Open browser challenge") }
+            } else if (isOffline) {
                 Icon(
                     imageVector = Icons.Default.WifiOff,
                     contentDescription = null,
@@ -320,15 +368,17 @@ private fun ErrorState(message: String, onRetry: () -> Unit) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Spacer(modifier = Modifier.size(4.dp))
+                Button(onClick = onRetry) { Text("Retry") }
             } else {
                 Text(
                     text = message,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error,
                 )
+                Spacer(modifier = Modifier.size(4.dp))
+                Button(onClick = onRetry) { Text("Retry") }
             }
-            Spacer(modifier = Modifier.size(4.dp))
-            Button(onClick = onRetry) { Text("Retry") }
         }
     }
 }

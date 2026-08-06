@@ -32,6 +32,8 @@ data class BrowseUiState(
     val searchQuery: String = "",
     val isCrossSourceSearch: Boolean = false,
     val isDiscoverMode: Boolean = false,
+    /** True when the active source timed out due to a Cloudflare challenge. */
+    val needsCfBypass: Boolean = false,
 )
 
 @HiltViewModel
@@ -97,6 +99,12 @@ class BrowseViewModel @Inject constructor(
         val state = _uiState.value
         _uiState.update { it.copy(error = null) }
         loadPage(state.currentPage)
+    }
+
+    /** Called after the Cloudflare WebView dialog successfully injects cookies. */
+    fun onCfBypassResolved() {
+        _uiState.update { it.copy(needsCfBypass = false, error = null) }
+        loadPage(page = 1)
     }
 
     fun refresh() {
@@ -220,17 +228,23 @@ class BrowseViewModel @Inject constructor(
                 }
                 .onFailure { throwable ->
                     if (throwable is CancellationException) return@launch
-                    val message = when (throwable) {
-                        is java.net.UnknownHostException,
-                        is java.net.SocketException -> "No internet connection"
-                        is java.net.SocketTimeoutException -> "Connection timed out"
+                    val isTimeout = throwable is java.net.SocketTimeoutException
+                    val message = when {
+                        throwable is java.net.UnknownHostException ||
+                            throwable is java.net.SocketException -> "No internet connection"
+                        isTimeout -> "Connection timed out"
                         else -> throwable.message ?: "Failed to load manga"
                     }
+                    // Manhwaz (sourceId 3) sits behind Cloudflare — a timeout almost certainly
+                    // means OkHttp is being silently dropped waiting for a JS challenge.
+                    // Signal the UI to open the WebView bypass dialog.
+                    val needsCf = isTimeout && sourceId == 3L
                     _uiState.update {
                         it.copy(
                             isLoading = false,
                             isLoadingMore = false,
                             error = message,
+                            needsCfBypass = needsCf,
                         )
                     }
                 }

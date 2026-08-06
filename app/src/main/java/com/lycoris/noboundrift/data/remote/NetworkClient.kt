@@ -19,9 +19,11 @@ object NetworkClient {
 
     /**
      * A realistic User-Agent based on Android Chrome — many manga sites block
-     * requests without a browser UA. Update periodically to stay current.
+     * requests without a browser UA. Also used as the WebView UA for Cloudflare
+     * bypass: cf_clearance is tied to the UA, so both must match exactly.
+     * Update periodically to stay current.
      */
-    private const val USER_AGENT =
+    const val USER_AGENT =
         "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 
@@ -45,6 +47,33 @@ object NetworkClient {
 
         override fun loadForRequest(url: HttpUrl): List<Cookie> =
             cookieStore[url.host]?.values?.toList() ?: emptyList()
+    }
+
+    /**
+     * Injects cookies harvested from an Android [android.webkit.WebView] into OkHttp's
+     * cookie jar. Call this after a Cloudflare JS challenge succeeds in a WebView so that
+     * subsequent OkHttp requests to the same host carry the `cf_clearance` cookie.
+     *
+     * [host] — the bare hostname, e.g. `"manhwaz.com"`.
+     * [cookieHeader] — the raw cookie string from [android.webkit.CookieManager.getCookie],
+     *   format: `"name1=val1; name2=val2; …"`.
+     */
+    fun injectWebViewCookies(host: String, cookieHeader: String) {
+        val hostMap = cookieStore.getOrPut(host) { ConcurrentHashMap() }
+        cookieHeader.split(";").forEach { part ->
+            val trimmed = part.trim()
+            val eqIdx = trimmed.indexOf('=')
+            if (eqIdx < 1) return@forEach
+            val name = trimmed.substring(0, eqIdx).trim()
+            val value = trimmed.substring(eqIdx + 1).trim()
+            val cookie = Cookie.Builder()
+                .name(name)
+                .value(value)
+                .domain(host)
+                .path("/")
+                .build()
+            hostMap["$name@$host"] = cookie
+        }
     }
 
     fun build(enableLogging: Boolean = false): OkHttpClient {
