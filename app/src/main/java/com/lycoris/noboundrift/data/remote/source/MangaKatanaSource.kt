@@ -53,7 +53,8 @@ class MangaKatanaSource @Inject constructor(
      * Selector verified: 2026-08-08
      */
     private fun fetchBrowseResults(page: Int): List<MangaPreview> {
-        val url = if (page <= 1) "$baseUrl/manga" else "$baseUrl/manga/page/$page"
+        // /latest lists by most-recently-updated; /manga lists by popularity. Use /latest.
+        val url = if (page <= 1) "$baseUrl/latest" else "$baseUrl/latest/page/$page"
         val doc = getDocument(url)
         return doc.select("div#book_list div.item[data-id]").mapNotNull { element ->
             val anchor = element.selectFirst("div.text h3.title > a") ?: return@mapNotNull null
