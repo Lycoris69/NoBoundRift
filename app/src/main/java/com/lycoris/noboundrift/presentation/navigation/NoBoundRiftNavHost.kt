@@ -135,6 +135,11 @@ fun NoBoundRiftNavHost(
                             Screen.Detail.createRoute(preview.sourceId, preview.url)
                         )
                     },
+                    onChapterClick = { sourceId, mangaId, chapterUrl, mangaTitle ->
+                        navController.navigate(
+                            Screen.Reader.createRoute(sourceId, mangaId, chapterUrl, mangaTitle)
+                        )
+                    },
                 )
             }
 

@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -64,6 +65,7 @@ private const val NEW_CHAPTER_WINDOW_MS = 7L * 24 * 3600 * 1000
 @Composable
 fun LibraryScreen(
     onMangaClick: (MangaPreview) -> Unit,
+    onChapterClick: (sourceId: Long, mangaId: String, chapterUrl: String, mangaTitle: String) -> Unit,
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -97,6 +99,7 @@ fun LibraryScreen(
                 DownloadsTab(
                     groups = uiState.downloadGroups,
                     onMangaClick = onMangaClick,
+                    onChapterClick = onChapterClick,
                     onCancelDownload = viewModel::cancelDownload,
                     onRetryDownload = viewModel::retryDownload,
                     onDeleteDownload = viewModel::deleteDownload,
@@ -294,6 +297,7 @@ private fun LibraryList(
 private fun DownloadsTab(
     groups: List<MangaDownloadGroup>,
     onMangaClick: (MangaPreview) -> Unit,
+    onChapterClick: (sourceId: Long, mangaId: String, chapterUrl: String, mangaTitle: String) -> Unit,
     onCancelDownload: (String) -> Unit,
     onRetryDownload: (DownloadEntity) -> Unit,
     onDeleteDownload: (String) -> Unit,
@@ -322,6 +326,9 @@ private fun DownloadsTab(
                     onRetryDownload = onRetryDownload,
                     onDeleteDownload = onDeleteDownload,
                     onCancelAll = onCancelAll,
+                    onChapterClick = { entity ->
+                        onChapterClick(group.sourceId, group.mangaUrl, entity.chapterUrl, group.mangaTitle)
+                    },
                     onClick = {
                         onMangaClick(
                             MangaPreview(
@@ -346,6 +353,7 @@ private fun MangaDownloadGroupCard(
     onRetryDownload: (DownloadEntity) -> Unit,
     onDeleteDownload: (String) -> Unit,
     onCancelAll: (String) -> Unit,
+    onChapterClick: (DownloadEntity) -> Unit,
     onClick: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -404,6 +412,7 @@ private fun MangaDownloadGroupCard(
                     onCancel = { onCancelDownload(entity.chapterUrl) },
                     onRetry = { onRetryDownload(entity) },
                     onDelete = { onDeleteDownload(entity.chapterUrl) },
+                    onRead = { onChapterClick(entity) },
                 )
             }
         }
@@ -416,10 +425,18 @@ private fun LibraryDownloadChapterRow(
     onCancel: () -> Unit,
     onRetry: () -> Unit,
     onDelete: () -> Unit,
+    onRead: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(
+                if (entity.status == DownloadStatus.COMPLETED) {
+                    Modifier.clickable(onClick = onRead)
+                } else {
+                    Modifier
+                }
+            )
             .padding(start = 68.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -454,7 +471,14 @@ private fun LibraryDownloadChapterRow(
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 }
-            DownloadStatus.COMPLETED ->
+            DownloadStatus.COMPLETED -> {
+                IconButton(onClick = onRead) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.MenuBook,
+                        contentDescription = "Read",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
                 IconButton(onClick = onDelete) {
                     Icon(
                         imageVector = Icons.Default.Delete,
@@ -462,6 +486,7 @@ private fun LibraryDownloadChapterRow(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+            }
         }
     }
 }
