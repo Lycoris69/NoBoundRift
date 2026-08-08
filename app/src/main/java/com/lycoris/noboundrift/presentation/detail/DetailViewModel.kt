@@ -15,6 +15,7 @@ import com.lycoris.noboundrift.domain.usecase.GetDownloadsUseCase
 import com.lycoris.noboundrift.domain.usecase.GetMangaDetailUseCase
 import com.lycoris.noboundrift.domain.usecase.QueueDownloadUseCase
 import com.lycoris.noboundrift.domain.usecase.ToggleLibraryUseCase
+import com.lycoris.noboundrift.data.remote.source.SourceManager
 import com.lycoris.noboundrift.domain.repository.MangaRepository
 import com.lycoris.noboundrift.presentation.navigation.Screen
 import com.lycoris.noboundrift.presentation.navigation.decodeFromNav
@@ -59,11 +60,15 @@ class DetailViewModel @Inject constructor(
     private val deleteDownloadUseCase: DeleteDownloadUseCase,
     private val cancelAllDownloadsUseCase: CancelAllDownloadsUseCase,
     private val getDownloads: GetDownloadsUseCase,
+    private val sourceManager: SourceManager,
 ) : ViewModel() {
 
     private val sourceId: Long = checkNotNull(savedStateHandle[Screen.Detail.ARG_SOURCE_ID])
     private val mangaUrl: String =
         checkNotNull(savedStateHandle.get<String>(Screen.Detail.ARG_URL)).decodeFromNav()
+
+    /** Human-readable name of the source this manga was fetched from (e.g. "MangaDex"). */
+    val sourceName: String = runCatching { sourceManager.getSource(sourceId).name }.getOrDefault("")
 
     private val _uiState = MutableStateFlow<DetailUiState>(DetailUiState.Loading)
     val uiState: StateFlow<DetailUiState> = _uiState.asStateFlow()

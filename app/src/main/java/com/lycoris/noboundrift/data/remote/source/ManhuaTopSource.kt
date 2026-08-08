@@ -85,10 +85,15 @@ class ManhuaTopSource @Inject constructor(
                 ?: imgElement?.attr("src") ?: ""
             val coverUrl = if (rawCover.startsWith("//")) "https:$rawCover" else rawCover
 
-            // Date is plain text in span.post-on — "2h ago", "3 days ago", "07/16/2024", etc.
-            // parseDateMillis handles relative expressions via its built-in regex fallback.
+            // Two DOM structures exist inside .chapter-item .post-on (verified 2026-08-08):
+            //   • Very recent: <span class="post-on"><a class="c-new-tag" title="4 hours ago">New</a></span>
+            //     → .text() returns "New"; the real date lives in a.c-new-tag[title]
+            //   • Older:       <span class="post-on">2h ago</span>  or  "07/16/2024"
+            //     → .text() returns the date string directly (use ownText() to skip child text)
             val postOnEl = card.selectFirst(".chapter-item .post-on")
-            val dateText = postOnEl?.text()?.trim() ?: ""
+            val dateText = postOnEl?.selectFirst("a.c-new-tag")?.attr("title")?.trim()
+                ?.takeIf { it.isNotBlank() }
+                ?: postOnEl?.ownText()?.trim() ?: ""
             val latestChapterAt = parseDateMillis(dateText, DATE_FORMATTER)
 
             val mangaId = mangaUrl.trimEnd('/').substringAfterLast('/')

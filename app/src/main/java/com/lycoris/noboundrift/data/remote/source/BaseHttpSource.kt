@@ -27,8 +27,11 @@ import java.util.Locale
 abstract class BaseHttpSource(protected val okHttpClient: OkHttpClient) : Source {
 
     companion object {
+        // Matches both full-word ("2 hours ago", "3 days ago") and single-letter abbreviated
+        // forms ("2h ago", "3d ago") used by some sources (e.g. ManhuaTop).
+        // Group 1 — numeric amount; Group 2 — unit word or letter.
         private val RELATIVE_DATE_REGEX = Regex(
-            "(\\d+)\\s+(second|sec|minute|min|hour|day|week|month|year)s?\\s+ago",
+            "(\\d+)\\s*(second|sec|s|minute|min|hour|h|day|d|week|w|month|year|yr)s?(?:\\s+ago)?",
             RegexOption.IGNORE_CASE,
         )
     }
@@ -105,18 +108,18 @@ abstract class BaseHttpSource(protected val okHttpClient: OkHttpClient) : Source
                 .toEpochMilli()
         }.onSuccess { return it }
 
-        // Fall back to relative expression: "X secs/mins/hours/days/weeks/months/years ago"
+        // Fall back to relative expression: "X hours ago", "2h ago", "3d ago", etc.
         val match = RELATIVE_DATE_REGEX.find(text) ?: return 0L
         val amount = match.groupValues[1].toLong()
         val unitMs = when (match.groupValues[2].lowercase(Locale.ROOT)) {
-            "second", "sec" -> 1_000L
-            "minute", "min" -> 60_000L
-            "hour"  -> 3_600_000L
-            "day"   -> 86_400_000L
-            "week"  -> 7 * 86_400_000L
-            "month" -> 30 * 86_400_000L
-            "year"  -> 365 * 86_400_000L
-            else    -> return 0L
+            "second", "sec", "s" -> 1_000L
+            "minute", "min"      -> 60_000L
+            "hour",   "h"        -> 3_600_000L
+            "day",    "d"        -> 86_400_000L
+            "week",   "w"        -> 7 * 86_400_000L
+            "month"              -> 30 * 86_400_000L
+            "year",   "yr"       -> 365 * 86_400_000L
+            else                 -> return 0L
         }
         return System.currentTimeMillis() - amount * unitMs
     }

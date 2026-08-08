@@ -125,6 +125,7 @@ fun DetailScreen(
                 is DetailUiState.Success -> {
                     MangaDetail(
                         manga = state.manga,
+                        sourceName = viewModel.sourceName,
                         isLoadingChapters = state.isLoadingChapters,
                         chaptersReversed = state.chaptersReversed,
                         lastReadChapterUrl = state.lastReadChapterUrl,
@@ -153,6 +154,7 @@ fun DetailScreen(
 @Composable
 private fun MangaDetail(
     manga: Manga,
+    sourceName: String,
     isLoadingChapters: Boolean,
     chaptersReversed: Boolean,
     lastReadChapterUrl: String?,
@@ -221,6 +223,13 @@ private fun MangaDetail(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    if (sourceName.isNotBlank()) {
+                        Text(
+                            text = sourceName,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
             }
         }
