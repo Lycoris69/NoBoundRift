@@ -68,23 +68,28 @@ class ManhuaTopSource @Inject constructor(
             "$baseUrl/manhua/page/$page/?m_orderby=latest"
         }
         val doc = getDocument(url)
-        // ManhuaTop's browse grid uses comic_post__item, not the Madara-standard page-item-detail
-        return doc.select("div.comic_post__item").mapNotNull { card ->
-            val anchor = card.selectFirst(".comic_post__title a") ?: return@mapNotNull null
+        // ManhuaTop uses the standard Madara page-item-detail card layout.
+        // (An earlier assumption of comic_post__item was incorrect — verified 2026-08-08.)
+        return doc.select("div.page-item-detail").mapNotNull { card ->
+            val anchor = card.selectFirst(".post-title h3 a") ?: return@mapNotNull null
             val title = anchor.text().trim()
             val mangaUrl = anchor.absUrl("href")
             if (mangaUrl.isBlank()) return@mapNotNull null
 
-            val imgElement = card.selectFirst("img")
+            val imgElement = card.selectFirst(".item-thumb img")
             val rawCover = imgElement?.attr("data-src")?.takeIf { it.isNotBlank() }
                 ?: imgElement?.attr("data-lazy-src")?.takeIf { it.isNotBlank() }
                 ?: imgElement?.attr("src") ?: ""
             val coverUrl = if (rawCover.startsWith("//")) "https:$rawCover" else rawCover
 
-            // Latest chapter date — relative ("8 minutes ago") or absolute ("07/25/2025").
-            // Relative dates fall through DATE_FORMATTER and are handled by the relative-
-            // expression regex in BaseHttpSource.parseDateMillis.
-            val dateText = card.selectFirst(".chapter-item .post-on")?.text()?.trim() ?: ""
+            // Two date formats exist in .post-on:
+            //  • Recent update: date is in <a class="c-new-tag" title="4 hours ago"> (text() is empty)
+            //  • Older update: bare text node "07/16/2024"
+            // Always try the title attribute of a.c-new-tag first.
+            val postOnEl = card.selectFirst(".chapter-item .post-on")
+            val dateText = postOnEl?.selectFirst("a.c-new-tag")?.attr("title")?.trim()
+                ?.takeIf { it.isNotBlank() }
+                ?: postOnEl?.text()?.trim() ?: ""
             val latestChapterAt = parseDateMillis(dateText, DATE_FORMATTER)
 
             val mangaId = mangaUrl.trimEnd('/').substringAfterLast('/')

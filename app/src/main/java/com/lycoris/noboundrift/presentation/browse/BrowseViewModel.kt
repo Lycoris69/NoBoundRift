@@ -320,8 +320,9 @@ class BrowseViewModel @Inject constructor(
      * bypass on timeout, or null if the source does not need one.
      */
     private fun cfInfoForSource(sourceId: Long): Pair<String, String>? = when (sourceId) {
-        3L -> "https://manhwaz.com" to "manhwaz.com"        // ManhwazSource
-        9L -> "https://manhwatop.com" to "manhwatop.com"    // ManhwaTopSource
+        3L -> "https://manhwaz.com" to "manhwaz.com"          // ManhwazSource
+        6L -> "https://manhuatop.org" to "manhuatop.org"      // ManhuaTopSource
+        9L -> "https://manhwatop.com" to "manhwatop.com"      // ManhwaTopSource
         else -> null
     }
 
