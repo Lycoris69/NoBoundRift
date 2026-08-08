@@ -32,6 +32,10 @@ class ManhuaTopSource @Inject constructor(
     override val id: Long = 6L
     override val name: String = "ManhuaTop"
     override val baseUrl: String = "https://manhuatop.org"
+    // Date parsing for abbreviated forms ("2h ago") is fragile enough that some items
+    // still land at 0L, causing DB-enriched items to jump to "Today" while others stay
+    // in "Before". Skip date grouping and preserve the source's latest-update order.
+    override val providesLatestDates: Boolean = false
 
     companion object {
         // DateTimeFormatter is immutable and thread-safe — declare once, reuse forever.
