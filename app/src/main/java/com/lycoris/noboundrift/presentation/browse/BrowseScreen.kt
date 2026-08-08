@@ -64,10 +64,10 @@ fun BrowseScreen(
     LaunchedEffect(uiState.needsCfBypass) {
         if (uiState.needsCfBypass) showCfDialog = true
     }
-    if (showCfDialog) {
+    if (showCfDialog && uiState.cfTargetUrl.isNotBlank()) {
         CloudflareWebViewDialog(
-            targetUrl = "https://manhwaz.com",
-            host = "manhwaz.com",
+            targetUrl = uiState.cfTargetUrl,
+            host = uiState.cfHost,
             onSuccess = {
                 showCfDialog = false
                 viewModel.onCfBypassResolved()

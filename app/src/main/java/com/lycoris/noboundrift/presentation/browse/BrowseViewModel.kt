@@ -34,6 +34,10 @@ data class BrowseUiState(
     val isDiscoverMode: Boolean = false,
     /** True when the active source timed out due to a Cloudflare challenge. */
     val needsCfBypass: Boolean = false,
+    /** Root URL to open in the WebView bypass dialog (e.g. "https://manhwaz.com"). */
+    val cfTargetUrl: String = "",
+    /** Bare hostname for cookie injection (e.g. "manhwaz.com"). */
+    val cfHost: String = "",
 )
 
 @HiltViewModel
@@ -235,16 +239,18 @@ class BrowseViewModel @Inject constructor(
                         isTimeout -> "Connection timed out"
                         else -> throwable.message ?: "Failed to load manga"
                     }
-                    // Manhwaz (sourceId 3) sits behind Cloudflare — a timeout almost certainly
-                    // means OkHttp is being silently dropped waiting for a JS challenge.
-                    // Signal the UI to open the WebView bypass dialog.
-                    val needsCf = isTimeout && sourceId == 3L
+                    // Some sources sit behind a Cloudflare JS challenge — OkHttp has no JS
+                    // engine so it is silently dropped. Signal the UI to open the WebView
+                    // bypass dialog so the user can solve the challenge once per session.
+                    val cfInfo = if (isTimeout) cfInfoForSource(sourceId) else null
                     _uiState.update {
                         it.copy(
                             isLoading = false,
                             isLoadingMore = false,
                             error = message,
-                            needsCfBypass = needsCf,
+                            needsCfBypass = cfInfo != null,
+                            cfTargetUrl = cfInfo?.first ?: it.cfTargetUrl,
+                            cfHost = cfInfo?.second ?: it.cfHost,
                         )
                     }
                 }
@@ -307,6 +313,16 @@ class BrowseViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    /**
+     * Returns a (targetUrl, host) pair for sources known to require a Cloudflare WebView
+     * bypass on timeout, or null if the source does not need one.
+     */
+    private fun cfInfoForSource(sourceId: Long): Pair<String, String>? = when (sourceId) {
+        3L -> "https://manhwaz.com" to "manhwaz.com"        // ManhwazSource
+        9L -> "https://manhwatop.com" to "manhwatop.com"    // ManhwaTopSource
+        else -> null
     }
 
     fun exitDiscoverMode() {

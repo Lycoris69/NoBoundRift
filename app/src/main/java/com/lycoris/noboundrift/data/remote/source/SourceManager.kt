@@ -17,12 +17,20 @@ class SourceManager @Inject constructor(
     manhwazSource: ManhwazSource,
     asuraScanSource: AsuraScanSource,
     mangaDexSource: MangaDexSource,
+    manhuaTopSource: ManhuaTopSource,
+    mgekoSource: MgekoSource,
+    mangaKatanaSource: MangaKatanaSource,
+    manhwaTopSource: ManhwaTopSource,
 ) {
     private val sources: Map<Long, Source> = listOf(
         mangaReadSource,
         manhwazSource,
         asuraScanSource,
         mangaDexSource,
+        manhuaTopSource,
+        mgekoSource,
+        mangaKatanaSource,
+        manhwaTopSource,
     ).associateBy { it.id }
 
     /**
