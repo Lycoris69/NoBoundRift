@@ -8,6 +8,9 @@ import com.lycoris.noboundrift.domain.model.Page
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
+import org.jsoup.Jsoup
 import java.net.URLEncoder
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -40,12 +43,6 @@ class MgekoSource @Inject constructor(
     companion object {
         // DateTimeFormatter is immutable and thread-safe — declare once, reuse forever.
 
-        // Used only as a required parameter to parseDateMillis for browse dates.
-        // Browse dates are always relative ("36 minutes ago" after transformation) and
-        // bypass this formatter via BaseHttpSource's relative-expression fallback.
-        private val BROWSE_DATE_FORMATTER: DateTimeFormatter =
-            DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.ENGLISH)
-
         // Format: "MMM d yyyy" (e.g. "Aug 8 2026") — used after extracting the date
         // portion from the chapter datetime string (e.g. "Aug. 8, 2026, 7:24 a.m.").
         private val CHAPTER_DATE_FORMATTER: DateTimeFormatter =
@@ -74,53 +71,75 @@ class MgekoSource @Inject constructor(
         }
 
     /**
-     * Fetches the browse catalogue.
-     * Page 1 uses /jumbo/manga/; subsequent pages use the `results` query parameter.
-     * Swiper carousel slides share the `novel-item` class with real cards — exclude them.
+     * Fetches the browse catalogue via the site's JSON API.
+     *
+     * The /browse-comics/ shell page is JS-rendered — card HTML is injected by the
+     * browser fetching /browse-comics/data/?page=N. We call that endpoint directly:
+     *   • `results_html` — pre-rendered card markup (string, parsed with Jsoup)
+     *   • `num_pages`    — total page count (289 pages, ~24 cards each)
+     *   • `page`         — current page echoed back for validation
+     *
+     * Card structure (inside results_html):
+     *   article.comic-card
+     *     .comic-card__cover a[href]   → manga URL
+     *     .comic-card__cover img[src]  → cover (eager, no data-src)
+     *     h3.comic-card__title a       → title text
+     *
+     * No last-update date is exposed in the browse listing.
+     *
      * Selector verified: 2026-08-08
      */
     private fun fetchBrowseResults(page: Int): List<MangaPreview> {
-        val url = if (page == 1) {
-            "$baseUrl/jumbo/manga/"
-        } else {
-            "$baseUrl/jumbo/manga/?results=$page&filter=All"
-        }
-        val doc = getDocument(url)
+        val apiUrl = "$baseUrl/browse-comics/data/?page=$page"
+        val request = Request.Builder()
+            .url(apiUrl)
+            .header("Referer", "$baseUrl/browse-comics/")
+            .header("X-Requested-With", "XMLHttpRequest")
+            .build()
 
-        return doc.select("li.novel-item")
-            // Swiper slides also use novel-item but are duplicates of carousel items
-            .filterNot { it.hasClass("swiper-slide") }
-            .mapNotNull { card ->
-                val anchor = card.selectFirst("a") ?: return@mapNotNull null
-                val mangaUrl = anchor.absUrl("href")
-                if (mangaUrl.isBlank()) return@mapNotNull null
-
-                val title = card.selectFirst("h4.novel-title")?.text()?.trim()
-                    ?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-
-                // Browse uses lazy-loaded images; data-src is the real URL
-                val imgElement = card.selectFirst("figure.novel-cover img")
-                val rawCover = imgElement?.attr("data-src")?.takeIf { it.isNotBlank() }
-                    ?: imgElement?.attr("src") ?: ""
-                val coverUrl = if (rawCover.startsWith("//")) "https:$rawCover" else rawCover
-
-                // Date text e.g. "Added 36 minutes" → strip prefix, append " ago"
-                // → "36 minutes ago", which matches BaseHttpSource's relative-date regex
-                val rawDateText = card.selectFirst("div.novel-stats span")?.text()?.trim() ?: ""
-                val dateText = rawDateText.replace("Added ", "").trim()
-                    .let { if (it.isNotBlank()) "$it ago" else "" }
-                val latestChapterAt = parseDateMillis(dateText, BROWSE_DATE_FORMATTER)
-
-                val mangaId = mangaUrl.trimEnd('/').substringAfterLast('/')
-                MangaPreview(
-                    id = mangaId,
-                    title = title,
-                    coverUrl = coverUrl,
-                    sourceId = id,
-                    url = mangaUrl,
-                    latestChapterAt = latestChapterAt,
-                )
+        val responseBody = okHttpClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IllegalStateException("HTTP ${response.code} from $apiUrl")
             }
+            response.body?.string()
+                ?: throw IllegalStateException("Empty body from $apiUrl")
+        }
+
+        val json = JSONObject(responseBody)
+        val numPages = json.optInt("num_pages", Int.MAX_VALUE)
+        if (page > numPages) return emptyList()
+
+        val resultsHtml = json.optString("results_html", "")
+        if (resultsHtml.isBlank()) return emptyList()
+
+        val doc = Jsoup.parse(resultsHtml, baseUrl)
+        return doc.select("article.comic-card").mapNotNull { card ->
+            val anchor = card.selectFirst(".comic-card__cover a") ?: return@mapNotNull null
+            val mangaUrl = anchor.absUrl("href")
+            if (mangaUrl.isBlank()) return@mapNotNull null
+
+            val title = card.selectFirst("h3.comic-card__title a")?.text()?.trim()
+                ?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+
+            // Browse listing uses eager loading (plain src), no lazy data-src
+            val imgElement = card.selectFirst(".comic-card__cover img")
+            val rawCover = imgElement?.attr("src") ?: ""
+            val coverUrl = when {
+                rawCover.startsWith("//") -> "https:$rawCover"
+                rawCover.isNotBlank() -> rawCover
+                else -> ""
+            }
+
+            val mangaId = mangaUrl.trimEnd('/').substringAfterLast('/')
+            MangaPreview(
+                id = mangaId,
+                title = title,
+                coverUrl = coverUrl,
+                sourceId = id,
+                url = mangaUrl,
+                latestChapterAt = 0L,   // browse listing does not expose update dates
+            )
+        }
     }
 
     /**

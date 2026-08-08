@@ -7,7 +7,11 @@ import com.lycoris.noboundrift.domain.model.MangaStatus
 import com.lycoris.noboundrift.domain.model.Page
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.jsoup.Jsoup
 import java.net.URLEncoder
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -87,32 +91,51 @@ class ManhwaTopSource @Inject constructor(
 
     /**
      * Fetches WordPress search results for [query].
+     * Tries standard Madara search card layout first; falls back to the browse-style
+     * card layout in case the site redirects the search URL to its catalogue homepage.
      * Selector verified: 2026-08-08
      */
     private fun fetchSearchResults(query: String): List<MangaPreview> {
         val encoded = URLEncoder.encode(query, "UTF-8")
         val doc = getDocument("$baseUrl/?s=$encoded&post_type=wp-manga")
-        // Search results page uses a different container selector than the browse grid.
-        return doc.select("div.c-tabs-item__content").mapNotNull { element ->
-            val anchor = element.selectFirst(".post-title h3 a") ?: return@mapNotNull null
+
+        // Standard Madara search layout.
+        // NOTE: search results use <h2 class="h5"> for titles while the browse page uses
+        // <h3 class="h5">. Using ".post-title a" (no heading tag) handles both.
+        // Verified: 2026-08-08 — every card on /?s=test&post_type=wp-manga uses h2, never h3.
+        val searchCards = doc.select("div.c-tabs-item__content")
+        if (searchCards.isNotEmpty()) {
+            return searchCards.mapNotNull { element ->
+                val anchor = element.selectFirst(".post-title a") ?: return@mapNotNull null
+                val title = anchor.text().trim()
+                val mangaUrl = anchor.absUrl("href")
+                if (mangaUrl.isBlank()) return@mapNotNull null
+
+                val imgElement = element.selectFirst(".tab-thumb img")
+                val rawCover = imgElement?.attr("data-src")?.takeIf { it.isNotBlank() }
+                    ?: imgElement?.attr("src") ?: ""
+                val coverUrl = if (rawCover.startsWith("//")) "https:$rawCover" else rawCover
+
+                val mangaId = mangaUrl.trimEnd('/').substringAfterLast('/')
+                MangaPreview(id = mangaId, title = title, coverUrl = coverUrl, sourceId = id, url = mangaUrl)
+            }
+        }
+
+        // Fallback: some Madara installs redirect ?post_type=wp-manga to the browse grid,
+        // returning page-item-detail cards instead of c-tabs-item__content cards.
+        return doc.select("div.page-item-detail").mapNotNull { element ->
+            val anchor = element.selectFirst(".post-title a") ?: return@mapNotNull null
             val title = anchor.text().trim()
             val mangaUrl = anchor.absUrl("href")
             if (mangaUrl.isBlank()) return@mapNotNull null
 
-            val imgElement = element.selectFirst(".tab-thumb img")
+            val imgElement = element.selectFirst(".item-thumb img")
             val rawCover = imgElement?.attr("data-src")?.takeIf { it.isNotBlank() }
                 ?: imgElement?.attr("src") ?: ""
             val coverUrl = if (rawCover.startsWith("//")) "https:$rawCover" else rawCover
 
             val mangaId = mangaUrl.trimEnd('/').substringAfterLast('/')
-
-            MangaPreview(
-                id = mangaId,
-                title = title,
-                coverUrl = coverUrl,
-                sourceId = id,
-                url = mangaUrl,
-            )
+            MangaPreview(id = mangaId, title = title, coverUrl = coverUrl, sourceId = id, url = mangaUrl)
         }
     }
 
@@ -166,15 +189,57 @@ class ManhwaTopSource @Inject constructor(
     // ---------------------------------------------------------------------------
 
     // Selectors verified: 2026-08-08
-    // Chapters are embedded directly in the manga page HTML — no AJAX step needed.
-    // (This differs from some other Madara forks that require an AJAX POST.)
+    // manhwatop.com does NOT embed li.wp-manga-chapter in static page HTML.
+    // The detail page has <div id="manga-chapters-holder" data-id="..."></div>
+    // as a placeholder; chapters are fetched by JS at runtime via two possible
+    // AJAX endpoints. We try all three tiers in order:
+    //   Tier 1 — static HTML (kept as a cheap check for future site changes)
+    //   Tier 2 — POST wp-admin/admin-ajax.php with action=manga_get_chapters
+    //   Tier 3 — POST {mangaUrl}/ajax/chapters/ (Madara fork fallback)
     override suspend fun fetchChapterList(mangaUrl: String): List<Chapter> =
         withContext(Dispatchers.IO) {
             val mangaId = mangaUrl.trimEnd('/').substringAfterLast('/')
             val doc = getDocument(mangaUrl)
+            var chapterDoc = doc
+
+            if (doc.select("li.wp-manga-chapter").isEmpty()) {
+                // Tier 2 — wp-admin/admin-ajax.php
+                val postId = doc.selectFirst("div#manga-chapters-holder")?.attr("data-id").orEmpty()
+                if (postId.isNotBlank()) {
+                    val body = "action=manga_get_chapters&manga=$postId"
+                        .toRequestBody("application/x-www-form-urlencoded; charset=UTF-8".toMediaType())
+                    val request = Request.Builder()
+                        .url("$baseUrl/wp-admin/admin-ajax.php")
+                        .post(body)
+                        .header("X-Requested-With", "XMLHttpRequest")
+                        .header("Referer", mangaUrl)
+                        .build()
+                    val html = okHttpClient.newCall(request).execute().use { resp ->
+                        if (resp.isSuccessful) resp.body?.string() else null
+                    }
+                    if (!html.isNullOrBlank()) chapterDoc = Jsoup.parse(html, mangaUrl)
+                }
+
+                // Tier 3 — {mangaUrl}/ajax/chapters/ (fallback for some Madara installs)
+                if (chapterDoc.select("li.wp-manga-chapter").isEmpty()) {
+                    val ajaxUrl = mangaUrl.trimEnd('/') + "/ajax/chapters/"
+                    val emptyBody = ByteArray(0).toRequestBody(null, 0, 0)
+                    val request = Request.Builder()
+                        .url(ajaxUrl)
+                        .post(emptyBody)
+                        .header("X-Requested-With", "XMLHttpRequest")
+                        .header("Content-Length", "0")
+                        .build()
+                    val html = okHttpClient.newCall(request).execute().use { resp ->
+                        if (resp.isSuccessful) resp.body?.string() else null
+                    }
+                    if (!html.isNullOrBlank()) chapterDoc = Jsoup.parse(html, mangaUrl)
+                }
+            }
+
             val chapterNumberRegex = Regex("Chapter\\s*([\\d.]+)", RegexOption.IGNORE_CASE)
 
-            val chapters = doc.select("li.wp-manga-chapter").mapIndexedNotNull { index, li ->
+            val chapters = chapterDoc.select("li.wp-manga-chapter").mapIndexedNotNull { index, li ->
                 val anchor = li.selectFirst("a") ?: return@mapIndexedNotNull null
                 val chapterUrl = anchor.absUrl("href")
                 if (chapterUrl.isBlank()) return@mapIndexedNotNull null
@@ -199,7 +264,6 @@ class ManhwaTopSource @Inject constructor(
                 )
             }
 
-            // HTML is newest-first; return ascending by chapter number.
             chapters.sortedBy { it.number }
         }
 
