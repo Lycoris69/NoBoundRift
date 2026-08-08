@@ -12,8 +12,11 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -36,12 +39,32 @@ private data class BottomNavItem(
 )
 
 @Composable
-fun NoBoundRiftNavHost() {
+fun NoBoundRiftNavHost(
+    viewModel: NavHostViewModel = hiltViewModel(),
+) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    val showDiscover by viewModel.showDiscoverTab.collectAsStateWithLifecycle()
 
-    val bottomNavItems = listOf(
+    // If the user is currently on the Discover screen and they toggle it off,
+    // redirect them to Browse so they don't stay on a "hidden" destination.
+    LaunchedEffect(showDiscover) {
+        if (!showDiscover) {
+            val onDiscover = currentDestination?.hierarchy?.any {
+                it.route == Screen.Recommendation.route
+            } == true
+            if (onDiscover) {
+                navController.navigate(Screen.Browse.createRoute()) {
+                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            }
+        }
+    }
+
+    val allBottomNavItems = listOf(
         BottomNavItem(
             screen = Screen.Library,
             label = "Library",
@@ -63,6 +86,8 @@ fun NoBoundRiftNavHost() {
             icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
         ),
     )
+    val bottomNavItems = if (showDiscover) allBottomNavItems
+    else allBottomNavItems.filter { it.screen != Screen.Recommendation }
 
     val showBottomBar = currentDestination?.hierarchy?.any { dest ->
         dest.route == Screen.Library.route ||

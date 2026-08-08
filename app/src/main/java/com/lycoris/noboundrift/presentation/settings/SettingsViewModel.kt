@@ -6,6 +6,7 @@ import com.lycoris.noboundrift.data.local.CachePreferences
 import com.lycoris.noboundrift.data.local.DownloadPreferences
 import com.lycoris.noboundrift.data.local.LibraryLayout
 import com.lycoris.noboundrift.data.local.LibraryPreferences
+import com.lycoris.noboundrift.data.local.NavigationPreferences
 import com.lycoris.noboundrift.data.local.PreloadMode
 import com.lycoris.noboundrift.data.local.ReaderPreferences
 import com.lycoris.noboundrift.data.local.SourcePreferences
@@ -25,6 +26,7 @@ data class SettingsUiState(
     val preloadMode: PreloadMode = PreloadMode.ALWAYS,
     val libraryLayout: LibraryLayout = LibraryLayout.GRID,
     val downloadConcurrency: Int = DownloadPreferences.DEFAULT_CONCURRENCY,
+    val showDiscoverTab: Boolean = NavigationPreferences.DEFAULT_SHOW_DISCOVER,
 )
 
 @HiltViewModel
@@ -35,22 +37,31 @@ class SettingsViewModel @Inject constructor(
     private val readerPreferences: ReaderPreferences,
     private val libraryPreferences: LibraryPreferences,
     private val downloadPreferences: DownloadPreferences,
+    private val navigationPreferences: NavigationPreferences,
 ) : ViewModel() {
 
+    // combine() has type-safe overloads only up to 5 flows. For the 6th (showDiscover)
+    // we nest a second combine so each lambda receives properly-typed parameters.
     val uiState: StateFlow<SettingsUiState> = combine(
-        sourcePreferences.observeSelectedSourceId(),
-        cachePreferences.observeCacheSizeBytes(),
-        readerPreferences.observePreloadMode(),
-        libraryPreferences.observeLibraryLayout(),
-        downloadPreferences.observeConcurrency(),
-    ) { selectedId, cacheSizeBytes, preloadMode, libraryLayout, concurrency ->
+        combine(
+            sourcePreferences.observeSelectedSourceId(),
+            cachePreferences.observeCacheSizeBytes(),
+            readerPreferences.observePreloadMode(),
+            libraryPreferences.observeLibraryLayout(),
+            downloadPreferences.observeConcurrency(),
+        ) { selectedId, cacheSizeBytes, preloadMode, libraryLayout, concurrency ->
+            PartialSettings(selectedId, cacheSizeBytes, preloadMode, libraryLayout, concurrency)
+        },
+        navigationPreferences.observeShowDiscover(),
+    ) { partial, showDiscover ->
         SettingsUiState(
             sources = sourceManager.getAllSources().sortedBy { it.id },
-            selectedSourceId = selectedId,
-            cacheSizeBytes = cacheSizeBytes,
-            preloadMode = preloadMode,
-            libraryLayout = libraryLayout,
-            downloadConcurrency = concurrency,
+            selectedSourceId = partial.selectedSourceId,
+            cacheSizeBytes = partial.cacheSizeBytes,
+            preloadMode = partial.preloadMode,
+            libraryLayout = partial.libraryLayout,
+            downloadConcurrency = partial.downloadConcurrency,
+            showDiscoverTab = showDiscover,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -73,4 +84,17 @@ class SettingsViewModel @Inject constructor(
     fun setDownloadConcurrency(value: Int) {
         downloadPreferences.setConcurrency(value)
     }
+
+    fun setShowDiscoverTab(show: Boolean) {
+        navigationPreferences.setShowDiscover(show)
+    }
 }
+
+/** Intermediate tuple for the nested [combine] inside [SettingsViewModel.uiState]. */
+private data class PartialSettings(
+    val selectedSourceId: Long,
+    val cacheSizeBytes: Long,
+    val preloadMode: PreloadMode,
+    val libraryLayout: LibraryLayout,
+    val downloadConcurrency: Int,
+)
