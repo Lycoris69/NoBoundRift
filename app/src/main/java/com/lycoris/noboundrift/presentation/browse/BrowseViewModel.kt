@@ -38,6 +38,12 @@ data class BrowseUiState(
     val cfTargetUrl: String = "",
     /** Bare hostname for cookie injection (e.g. "manhwaz.com"). */
     val cfHost: String = "",
+    /**
+     * False for sources whose browse listing carries no date information (e.g. Mgeko).
+     * When false the UI skips the Today / Before date-group headers and displays items
+     * in source order, preventing DB-enriched dates from scrambling the list.
+     */
+    val showDateGroups: Boolean = true,
 )
 
 @HiltViewModel
@@ -75,6 +81,8 @@ class BrowseViewModel @Inject constructor(
                 if (!initialized) {
                     initialized = true
                     sourceId = newSourceId
+                    val showDates = runCatching { sourceManager.getSource(newSourceId).providesLatestDates }.getOrDefault(true)
+                    _uiState.update { it.copy(showDateGroups = showDates) }
                     if (altTitles.isNotEmpty()) {
                         val allTitles = (listOf(initialQuery) + altTitles).filter { it.isNotBlank() }.distinct()
                         launchMultiTitleSearch(allTitles)
@@ -86,7 +94,8 @@ class BrowseViewModel @Inject constructor(
                     searchJob?.cancel()
                     loadJob?.cancel()
                     crossSourceJob?.cancel()
-                    _uiState.update { BrowseUiState(searchQuery = it.searchQuery) }
+                    val showDates = runCatching { sourceManager.getSource(newSourceId).providesLatestDates }.getOrDefault(true)
+                    _uiState.update { BrowseUiState(searchQuery = it.searchQuery, showDateGroups = showDates) }
                     loadPage(page = 1)
                 }
             }

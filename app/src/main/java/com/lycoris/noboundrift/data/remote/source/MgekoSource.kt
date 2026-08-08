@@ -39,6 +39,9 @@ class MgekoSource @Inject constructor(
     override val id: Long = 7L
     override val name: String = "Mgeko"
     override val baseUrl: String = "https://www.mgeko.cc"
+    // The browse-comics JSON API does not include last-update timestamps.
+    // Skip date grouping so items stay in their source-defined order.
+    override val providesLatestDates: Boolean = false
 
     companion object {
         // DateTimeFormatter is immutable and thread-safe — declare once, reuse forever.

@@ -23,6 +23,14 @@ interface Source {
     val baseUrl: String
 
     /**
+     * True when [fetchMangaList] populates [MangaPreview.latestChapterAt] with real update
+     * timestamps. Set to false for sources whose browse listing carries no date information
+     * — the UI will skip the Today / Before date-grouping sections and display items in
+     * the order the source returns them.
+     */
+    val providesLatestDates: Boolean get() = true
+
+    /**
      * Returns a page of manga entries from the source's catalogue or search results.
      * @param page 1-based page number.
      * @param query Optional search query. When blank, returns the catalogue browse order.

@@ -230,8 +230,8 @@ private fun BrowseGrid(
 
     val isSearching = uiState.searchQuery.isNotBlank()
     val isCrossSourceSearch = uiState.isCrossSourceSearch
-    val groups = remember(uiState.manga, isSearching, isCrossSourceSearch) {
-        if (isSearching || isCrossSourceSearch) null
+    val groups = remember(uiState.manga, isSearching, isCrossSourceSearch, uiState.showDateGroups) {
+        if (isSearching || isCrossSourceSearch || !uiState.showDateGroups) null
         else groupByDate(uiState.manga).takeIf { it.today.isNotEmpty() || it.lastThreeDays.isNotEmpty() }
     }
 
