@@ -13,6 +13,7 @@ Personal Android manga and webtoon reader. Content is sourced by scraping third-
 - Two reading modes: webtoon scroll and page-by-page flip
 - Seamless auto-load of the next chapter when reaching the end
 - **Chapter picker** — tap the chapter title in the reader top bar to open a scrollable dropdown of all chapters; current chapter is highlighted; tap any entry to jump directly to it
+- **Chapter progress %** — top bar shows percentage through the current chapter (e.g. `42%`); resets to 0% when crossing into the next chapter during seamless load
 - **Continue Reading** — resumes the exact chapter and page you were on when you last exited
 - Chapter marked as read automatically at 80%+ progress
 - Lock icon on premium/paywalled chapters
