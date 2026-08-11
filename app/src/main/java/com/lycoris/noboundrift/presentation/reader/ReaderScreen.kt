@@ -193,8 +193,7 @@ fun ReaderScreen(
                     modifier = Modifier.align(Alignment.TopStart),
                 ) {
                     ReaderTopBar(
-                        currentPage = uiState.currentPageIndex + 1,
-                        totalPages = uiState.pages.size,
+                        chapterProgressPercent = uiState.chapterProgressPercent,
                         mangaTitle = uiState.mangaTitle,
                         currentChapterTitle = uiState.currentChapterTitle,
                         readerMode = uiState.readerMode,
@@ -454,8 +453,7 @@ private fun PageImage(
 
 @Composable
 private fun ReaderTopBar(
-    currentPage: Int,
-    totalPages: Int,
+    chapterProgressPercent: Int,
     mangaTitle: String,
     currentChapterTitle: String,
     readerMode: ReaderMode,
@@ -513,8 +511,8 @@ private fun ReaderTopBar(
                     horizontalArrangement = Arrangement.Center,
                 ) {
                     Text(
-                        text = if (currentChapterTitle.isNotEmpty()) "$currentChapterTitle  $currentPage / $totalPages"
-                               else "$currentPage / $totalPages",
+                        text = if (currentChapterTitle.isNotEmpty()) "$currentChapterTitle  $chapterProgressPercent%"
+                               else "$chapterProgressPercent%",
                         color = Color.White,
                         style = MaterialTheme.typography.labelSmall,
                         textAlign = TextAlign.Center,

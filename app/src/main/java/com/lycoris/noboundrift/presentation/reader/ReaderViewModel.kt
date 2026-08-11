@@ -50,6 +50,10 @@ data class ReaderUiState(
     val imageRetryKey: Int = 0,
     val sortedChapters: List<Chapter> = emptyList(),
     val currentChapterUrl: String = "",
+    // Percentage progress through the active chapter only (0–100). Resets to 0 on chapter jump.
+    // Computed in the ViewModel (needs chapterSegments) and pushed here to avoid re-deriving it
+    // in the UI, where chapterSegments is not visible.
+    val chapterProgressPercent: Int = 0,
 )
 
 @HiltViewModel
@@ -109,6 +113,7 @@ class ReaderViewModel @Inject constructor(
 
     fun onPageChanged(index: Int) {
         val activeSegment = chapterSegments.lastOrNull { it.startIndex <= index }
+        val pct = computeChapterPercent(index)
         if (activeSegment != null && activeSegment.url.trimEnd('/') != currentChapterUrl.trimEnd('/')) {
             currentChapterUrl = activeSegment.url
             val newTitle = chapterTitleFor(activeSegment.url)
@@ -119,11 +124,28 @@ class ReaderViewModel @Inject constructor(
                     currentChapterUrl = activeSegment.url,
                     canGoToPrevChapter = findPrevBefore(activeSegment.url) != null,
                     canGoToNextChapter = findNextAfter(activeSegment.url) != null,
+                    chapterProgressPercent = pct,
                 )
             }
         } else {
-            _uiState.update { it.copy(currentPageIndex = index) }
+            _uiState.update { it.copy(currentPageIndex = index, chapterProgressPercent = pct) }
         }
+    }
+
+    /**
+     * Computes the read percentage through the active chapter for a given global [index].
+     * Uses [chapterSegments] to determine the active chapter's page window so the result
+     * resets to ~0% when the reader crosses into a new chapter during seamless auto-load.
+     */
+    private fun computeChapterPercent(index: Int): Int {
+        val pagesSize = _uiState.value.pages.size
+        val activeSegment = chapterSegments.lastOrNull { it.startIndex <= index } ?: return 0
+        val nextSegmentStart = chapterSegments.firstOrNull { it.startIndex > index }?.startIndex
+            ?: pagesSize
+        val chapterPageCount = nextSegmentStart - activeSegment.startIndex
+        if (chapterPageCount <= 0) return 0
+        val pageWithinChapter = index - activeSegment.startIndex + 1
+        return (pageWithinChapter * 100) / chapterPageCount
     }
 
     fun retry() {
@@ -232,6 +254,7 @@ class ReaderViewModel @Inject constructor(
                 isLoading = true,
                 error = null,
                 currentPageIndex = 0,
+                chapterProgressPercent = 0,
                 isLoadingNextChapter = false,
                 canGoToPrevChapter = findPrevBefore(url) != null,
                 canGoToNextChapter = findNextAfter(url) != null,
