@@ -121,10 +121,14 @@ class ManhwazSource @Inject constructor(
                 ?: imgElement?.attr("src") ?: ""
             val coverUrl = if (rawCover.startsWith("//")) "https:$rawCover" else rawCover
 
-            // First non-blank paragraph of the synopsis block
-            val synopsis = doc.select(".summary__content p")
-                .firstOrNull { it.text().isNotBlank() }
-                ?.text()?.trim() ?: ""
+            // ManhwaZ prepends site boilerplate ending in "The Summary is" — strip it (verified 2026-08-11)
+            val rawSynopsis = doc.select(".summary__content p").joinToString("\n") { it.text() }
+            val markerIndex = rawSynopsis.indexOf("The Summary is", ignoreCase = true)
+            val synopsis = if (markerIndex >= 0) {
+                rawSynopsis.substring(markerIndex + "The Summary is".length).trimStart()
+            } else {
+                doc.select(".summary__content p").firstOrNull { it.text().isNotBlank() }?.text()?.trim() ?: ""
+            }
 
             val genres = doc.select(".genres-content a")
                 .map { it.text().trim() }

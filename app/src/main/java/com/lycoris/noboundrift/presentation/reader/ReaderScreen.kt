@@ -25,8 +25,11 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
@@ -34,6 +37,8 @@ import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.ViewDay
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -44,7 +49,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -70,6 +77,7 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Dimension
 import coil.size.Size as CoilSize
+import com.lycoris.noboundrift.domain.model.Chapter
 import com.lycoris.noboundrift.domain.model.Page
 
 /**
@@ -192,11 +200,14 @@ fun ReaderScreen(
                         readerMode = uiState.readerMode,
                         canGoToPrevChapter = uiState.canGoToPrevChapter,
                         canGoToNextChapter = uiState.canGoToNextChapter,
+                        sortedChapters = uiState.sortedChapters,
+                        currentChapterUrl = uiState.currentChapterUrl,
                         onBackClick = { onBackClick() },
                         onToggleMode = viewModel::toggleReaderMode,
                         onPrevChapter = viewModel::goToPrevChapter,
                         onNextChapter = viewModel::goToNextChapter,
                         onRetryImages = viewModel::retryImages,
+                        onChapterSelect = viewModel::jumpToChapter,
                     )
                 }
             }
@@ -450,12 +461,17 @@ private fun ReaderTopBar(
     readerMode: ReaderMode,
     canGoToPrevChapter: Boolean,
     canGoToNextChapter: Boolean,
+    sortedChapters: List<Chapter>,
+    currentChapterUrl: String,
     onBackClick: () -> Unit,
     onToggleMode: () -> Unit,
     onPrevChapter: () -> Unit,
     onNextChapter: () -> Unit,
     onRetryImages: () -> Unit,
+    onChapterSelect: (String) -> Unit,
 ) {
+    var showChapterPicker by remember { mutableStateOf(false) }
+    val chapterScrollState = rememberScrollState()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -474,30 +490,76 @@ private fun ReaderTopBar(
                 tint = Color.White.copy(alpha = if (canGoToPrevChapter) 1f else 0.4f),
             )
         }
-        Column(
-            modifier = Modifier.weight(1f),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            if (mangaTitle.isNotEmpty()) {
-                Text(
-                    text = mangaTitle,
-                    color = Color.White.copy(alpha = 0.8f),
-                    style = MaterialTheme.typography.labelSmall,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+        Box(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = sortedChapters.isNotEmpty()) { showChapterPicker = true },
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                if (mangaTitle.isNotEmpty()) {
+                    Text(
+                        text = mangaTitle,
+                        color = Color.White.copy(alpha = 0.8f),
+                        style = MaterialTheme.typography.labelSmall,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    Text(
+                        text = if (currentChapterTitle.isNotEmpty()) "$currentChapterTitle  $currentPage / $totalPages"
+                               else "$currentPage / $totalPages",
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (sortedChapters.isNotEmpty()) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
             }
-            Text(
-                text = if (currentChapterTitle.isNotEmpty()) "$currentChapterTitle  $currentPage / $totalPages"
-                       else "$currentPage / $totalPages",
-                color = Color.White,
-                style = MaterialTheme.typography.labelSmall,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            DropdownMenu(
+                expanded = showChapterPicker,
+                onDismissRequest = { showChapterPicker = false },
+            ) {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 400.dp)
+                        .verticalScroll(chapterScrollState),
+                ) {
+                    sortedChapters.forEach { chapter ->
+                        val isActive = chapter.url.trimEnd('/') == currentChapterUrl.trimEnd('/')
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = chapter.title.ifBlank { "Chapter ${chapter.number.toInt()}" },
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = if (isActive) MaterialTheme.colorScheme.primary
+                                            else Color.Unspecified,
+                                )
+                            },
+                            onClick = {
+                                showChapterPicker = false
+                                onChapterSelect(chapter.url)
+                            },
+                        )
+                    }
+                }
+            }
         }
         IconButton(onClick = onNextChapter, enabled = canGoToNextChapter) {
             Icon(

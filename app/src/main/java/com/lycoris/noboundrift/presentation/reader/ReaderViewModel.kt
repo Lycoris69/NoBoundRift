@@ -48,6 +48,8 @@ data class ReaderUiState(
     val mangaTitle: String = "",
     val currentChapterTitle: String = "",
     val imageRetryKey: Int = 0,
+    val sortedChapters: List<Chapter> = emptyList(),
+    val currentChapterUrl: String = "",
 )
 
 @HiltViewModel
@@ -73,6 +75,7 @@ class ReaderViewModel @Inject constructor(
             mangaTitle = savedStateHandle.get<String>(Screen.Reader.ARG_MANGA_TITLE)
                 ?.decodeFromNav()
                 .orEmpty(),
+            currentChapterUrl = chapterUrl,
         )
     )
     val uiState: StateFlow<ReaderUiState> = _uiState.asStateFlow()
@@ -113,6 +116,7 @@ class ReaderViewModel @Inject constructor(
                 it.copy(
                     currentPageIndex = index,
                     currentChapterTitle = newTitle.ifEmpty { it.currentChapterTitle },
+                    currentChapterUrl = activeSegment.url,
                     canGoToPrevChapter = findPrevBefore(activeSegment.url) != null,
                     canGoToNextChapter = findNextAfter(activeSegment.url) != null,
                 )
@@ -217,7 +221,7 @@ class ReaderViewModel @Inject constructor(
         jumpToChapter(next)
     }
 
-    private fun jumpToChapter(url: String) {
+    fun jumpToChapter(url: String) {
         nearEndJob?.cancel()
         chapterSegments.clear()
         currentChapterUrl = url
@@ -233,6 +237,7 @@ class ReaderViewModel @Inject constructor(
                 canGoToNextChapter = findNextAfter(url) != null,
                 chapterKey = it.chapterKey + 1,
                 currentChapterTitle = chapterTitleFor(url),
+                currentChapterUrl = url,
             )
         }
         loadPages()
@@ -279,6 +284,7 @@ class ReaderViewModel @Inject constructor(
                             canGoToPrevChapter = findPrevBefore(currentChapterUrl) != null,
                             canGoToNextChapter = findNextAfter(currentChapterUrl) != null,
                             currentChapterTitle = chapterTitleFor(currentChapterUrl),
+                            sortedChapters = sortedChapters,
                         )
                     }
                     // Bug 3: if pages are already loaded and the reader is near the end,
@@ -316,6 +322,7 @@ class ReaderViewModel @Inject constructor(
                             canGoToPrevChapter = findPrevBefore(currentChapterUrl) != null,
                             canGoToNextChapter = findNextAfter(currentChapterUrl) != null,
                             currentChapterTitle = chapterTitleFor(currentChapterUrl),
+                            sortedChapters = sortedChapters,
                         )
                     }
                     val state = _uiState.value
