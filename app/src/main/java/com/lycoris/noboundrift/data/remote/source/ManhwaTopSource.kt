@@ -31,6 +31,10 @@ class ManhwaTopSource @Inject constructor(
     override val id: Long = 9L
     override val name: String = "ManhwaTop"
     override val baseUrl: String = "https://manhwatop.com"
+    // Relative date strings ("8 minutes ago") are fragile enough that some items land at 0L,
+    // causing DB-enriched items to jump to "Today" while others stay in "Before".
+    // Skip date grouping and preserve the source's latest-update order instead.
+    override val providesLatestDates: Boolean = false
 
     companion object {
         // DateTimeFormatter is immutable and thread-safe — declare once, reuse forever.
@@ -54,11 +58,11 @@ class ManhwaTopSource @Inject constructor(
         }
 
     /**
-     * Fetches the standard catalogue browse page.
+     * Fetches the catalogue browse page sorted by latest update.
      * Selector verified: 2026-08-08
      */
     private fun fetchBrowseResults(page: Int): List<MangaPreview> {
-        val url = if (page <= 1) "$baseUrl/manga/" else "$baseUrl/manga/page/$page/"
+        val url = if (page <= 1) "$baseUrl/manga/?m_orderby=latest" else "$baseUrl/manga/page/$page/?m_orderby=latest"
         val doc = getDocument(url)
         return doc.select("div.page-item-detail").mapNotNull { element ->
             val anchor = element.selectFirst(".post-title h3 a") ?: return@mapNotNull null
