@@ -9,35 +9,49 @@ Personal Android manga and webtoon reader. Content is sourced by scraping third-
 
 ## Features
 
-- Browse and search manga/webtoon from multiple sources
-- Manga detail page with chapter list — sortable oldest-first or newest-first
+### Reading
 - Two reading modes: webtoon scroll and page-by-page flip
 - Seamless auto-load of the next chapter when reaching the end
-- **Continue Reading** — resumes the exact chapter you were on when you last exited
+- **Chapter picker** — tap the chapter title in the reader top bar to open a scrollable dropdown of all chapters; current chapter is highlighted; tap any entry to jump directly to it
+- **Continue Reading** — resumes the exact chapter and page you were on when you last exited
 - Chapter marked as read automatically at 80%+ progress
-- Local library — bookmark titles and track reading progress
-- **Drag-to-reorder library** — long-press a cover then drag to reposition it (grid and list modes)
-- **NEW badge + auto-sort** — manga with a chapter released in the last 7 days are marked NEW and float to the top of the library automatically
-- **Library layout setting** — switch between grid and list view in Settings
 - Lock icon on premium/paywalled chapters
-- User-friendly error screen with Retry instead of a crash
 - Image refresh button in the reader top bar to retry failed page loads
-- **Chapter downloads** — download chapters for offline reading in the background via WorkManager
-- **Download All / Cancel All** — queues every chapter sequentially; button switches to Cancel All while downloads are active
+
+### Library
+- Local library — bookmark titles and track reading progress
+- **Drag-to-reorder** — long-press a cover then drag to reposition (grid and list modes)
+- **NEW badge + auto-sort** — manga with a chapter released in the last 7 days float to the top automatically
+- **Library layout setting** — switch between grid and list view in Settings
+
+### Downloads
+- **Chapter downloads** — download chapters for offline reading via WorkManager
+- **Download All / Cancel All** — queues every chapter; button switches to Cancel All while active
+- **Read from Downloads** — tap any completed chapter in Library → Downloads to read it offline without a network connection
 - **Downloads tab** in the library and detail screens to manage downloaded chapters
-- **Inline download controls in Library** — expand a manga group to cancel, retry, or delete individual chapters without leaving the library
+- **Inline download controls** — expand a manga group in the Library Downloads tab to cancel, retry, or delete individual chapters
+- **Parallel downloads** — configurable concurrency (1–20 chapters at a time) in Settings
 - **Offline fallback** — Detail screen builds from local downloads when the network is unavailable
-- Friendly offline error with WifiOff icon in Browse instead of a raw exception message
+
+### Browse & Discovery
+- Browse and search manga/webtoon across 8 sources
 - Refresh button in the Browse search bar to re-run the current search
+- Friendly offline error with WifiOff icon instead of a raw exception message
+- **Discover tab** — AniList-powered recommendations with cross-source search; toggle visibility in Settings
+- **Source label** on the manga detail page
 
 ## Sources
 
-| Source | Site | Method |
-|--------|------|--------|
-| MangaRead | mangaread.org | Jsoup scraper |
-| Manhwaz | manhwaz.com | Jsoup scraper |
-| AsuraScans | asurascans.com | Jsoup + Astro SSR JSON props |
-| MangaDex | mangadex.org | Official REST API + CDN |
+| Source | Site | Method | Notes |
+|--------|------|--------|-------|
+| MangaRead | mangaread.org | Jsoup scraper | Madara/WordPress |
+| Manhwaz | manhwaz.com | Jsoup scraper | Custom Madara-like |
+| AsuraScans | asurascans.com | Jsoup + Astro SSR props | Data in `<astro-island>` JSON |
+| MangaDex | mangadex.org | Official REST API + CDN | |
+| ManhuaTop | manhuatop.org | Jsoup scraper | Madara; AJAX chapter list |
+| Mgeko | mgeko.cc | Jsoup + JSON API | Custom site; chapters via /all-chapters/ |
+| MangaKatana | mangakatana.com | Jsoup scraper | Custom site; static HTML |
+| ManhwaTop | manhwatop.com | Jsoup scraper | Madara; 3-tier AJAX chapter fetch; Cloudflare |
 
 ## Stack
 
