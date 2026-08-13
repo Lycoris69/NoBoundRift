@@ -1,8 +1,10 @@
 package com.lycoris.noboundrift.data.repository
 
 import android.content.Context
+import androidx.work.Constraints
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.lycoris.noboundrift.data.download.ChapterDownloadWorker
@@ -184,14 +186,20 @@ class DownloadRepositoryImpl @Inject constructor(
             .putString(ChapterDownloadWorker.KEY_LOCAL_DIR, localDir)
             .putString(ChapterDownloadWorker.KEY_MANGA_ID, mangaId)
             .build()
-        val request = OneTimeWorkRequestBuilder<ChapterDownloadWorker>()
+        val requestBuilder = OneTimeWorkRequestBuilder<ChapterDownloadWorker>()
             .setInputData(inputData)
             .addTag(workTag(normalizedUrl))
-            .build()
+        if (downloadPreferences.isWifiOnly()) {
+            requestBuilder.setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.UNMETERED)
+                    .build()
+            )
+        }
         workManager.enqueueUniqueWork(
             workTag(normalizedUrl),
             ExistingWorkPolicy.KEEP,
-            request,
+            requestBuilder.build(),
         )
     }
 }

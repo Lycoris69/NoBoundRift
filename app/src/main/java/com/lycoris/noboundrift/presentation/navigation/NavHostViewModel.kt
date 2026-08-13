@@ -2,6 +2,7 @@ package com.lycoris.noboundrift.presentation.navigation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lycoris.noboundrift.data.local.AppearancePreferences
 import com.lycoris.noboundrift.data.local.NavigationPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -12,9 +13,14 @@ import javax.inject.Inject
 @HiltViewModel
 class NavHostViewModel @Inject constructor(
     navigationPreferences: NavigationPreferences,
+    appearancePreferences: AppearancePreferences,
 ) : ViewModel() {
 
     val showDiscoverTab: StateFlow<Boolean> = navigationPreferences
         .observeShowDiscover()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NavigationPreferences.DEFAULT_SHOW_DISCOVER)
+
+    val hideBottomBarLabels: StateFlow<Boolean> = appearancePreferences
+        .observeHideBottomBarLabels()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppearancePreferences.DEFAULT_HIDE_LABELS)
 }

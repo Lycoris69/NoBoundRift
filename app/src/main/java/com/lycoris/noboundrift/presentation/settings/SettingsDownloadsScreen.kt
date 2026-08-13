@@ -1,5 +1,6 @@
 package com.lycoris.noboundrift.presentation.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,11 +10,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -74,6 +78,18 @@ fun SettingsDownloadsScreen(
                     steps = 18,
                 )
             }
+            HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
+            ListItem(
+                headlineContent = { Text("Wi-Fi Only") },
+                supportingContent = { Text("Only download chapters on Wi-Fi") },
+                trailingContent = {
+                    Switch(
+                        checked = uiState.wifiOnlyDownload,
+                        onCheckedChange = viewModel::setWifiOnlyDownload,
+                    )
+                },
+                modifier = Modifier.clickable { viewModel.setWifiOnlyDownload(!uiState.wifiOnlyDownload) },
+            )
         }
     }
 }

@@ -32,6 +32,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -49,6 +50,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lycoris.noboundrift.data.local.AccentColor
 import com.lycoris.noboundrift.data.local.AppFont
+import com.lycoris.noboundrift.data.local.AppPreset
 import com.lycoris.noboundrift.data.local.AppTheme
 import com.lycoris.noboundrift.presentation.theme.toPalette
 
@@ -60,12 +62,49 @@ fun SettingsAppearanceScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showThemeDialog by remember { mutableStateOf(false) }
+    var showPresetDialog by remember { mutableStateOf(false) }
 
     if (showThemeDialog) {
         ThemePickerDialog(
             selectedTheme = uiState.appTheme,
             onSelect = { viewModel.setAppTheme(it); showThemeDialog = false },
             onDismiss = { showThemeDialog = false },
+        )
+    }
+
+    if (showPresetDialog) {
+        AlertDialog(
+            onDismissRequest = { showPresetDialog = false },
+            title = { Text("Preset Theme") },
+            text = {
+                Column {
+                    Text(
+                        text = "Overrides Accent Colour when not None.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    AppPreset.entries.forEach { preset ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.setAppPreset(preset); showPresetDialog = false }
+                                .padding(vertical = 4.dp),
+                        ) {
+                            RadioButton(
+                                selected = preset == uiState.appPreset,
+                                onClick = { viewModel.setAppPreset(preset); showPresetDialog = false },
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(preset.displayName, style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showPresetDialog = false }) { Text("Done") }
+            },
         )
     }
 
@@ -98,6 +137,20 @@ fun SettingsAppearanceScreen(
                     )
                 },
                 modifier = Modifier.clickable { showThemeDialog = true },
+            )
+            HorizontalDivider()
+            // Preset theme
+            ListItem(
+                headlineContent = { Text("Preset Theme") },
+                supportingContent = { Text(uiState.appPreset.displayName) },
+                trailingContent = {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForwardIos,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                },
+                modifier = Modifier.clickable { showPresetDialog = true },
             )
             HorizontalDivider()
             // Accent colour — inline swatches
@@ -141,6 +194,19 @@ fun SettingsAppearanceScreen(
                     }
                 }
             }
+            HorizontalDivider()
+            // Hide bottom navigation bar labels
+            ListItem(
+                headlineContent = { Text("Hide Navigation Labels") },
+                supportingContent = { Text("Show only icons in the bottom bar") },
+                trailingContent = {
+                    Switch(
+                        checked = uiState.hideBottomBarLabels,
+                        onCheckedChange = viewModel::setHideBottomBarLabels,
+                    )
+                },
+                modifier = Modifier.clickable { viewModel.setHideBottomBarLabels(!uiState.hideBottomBarLabels) },
+            )
         }
     }
 }

@@ -7,6 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material.icons.filled.Accessibility
 import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Language
@@ -40,6 +41,7 @@ fun SettingsScreen(
     onNavigateToLibrary: () -> Unit,
     onNavigateToDownloads: () -> Unit,
     onNavigateToNavigation: () -> Unit,
+    onNavigateToAccessibility: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -93,6 +95,13 @@ fun SettingsScreen(
                 title = "Navigation",
                 subtitle = if (uiState.showDiscoverTab) "Discover tab visible" else "Discover tab hidden",
                 onClick = onNavigateToNavigation,
+            )
+            InsetDivider()
+            SectionEntry(
+                icon = Icons.Default.Accessibility,
+                title = "Accessibility",
+                subtitle = if (uiState.hapticFeedback) "Haptics on" else "Haptics off",
+                onClick = onNavigateToAccessibility,
             )
         }
     }

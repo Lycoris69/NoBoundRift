@@ -2,6 +2,7 @@ package com.lycoris.noboundrift.presentation.theme
 
 import androidx.compose.ui.graphics.Color
 import com.lycoris.noboundrift.data.local.AccentColor
+import com.lycoris.noboundrift.data.local.AppPreset
 
 // ── Dark palette ──────────────────────────────────────────────────────────────
 // Deep ink-black background — reduces eye strain during long reading sessions.
@@ -61,4 +62,18 @@ fun AccentColor.toPalette(): AccentPalette = when (this) {
     AccentColor.GREEN  -> AccentPalette(Color(0xFF81C784), Color(0xFF388E3C), Color(0xFFFFB74D))
     AccentColor.ROSE   -> AccentPalette(Color(0xFFE91E63), Color(0xFFC2185B), Color(0xFFFF8A65))
     AccentColor.ORANGE -> AccentPalette(Color(0xFFFF8A65), Color(0xFFE64A19), Color(0xFF80DEEA))
+}
+
+/**
+ * Returns the [AccentPalette] for this preset, or null if [AppPreset.NONE]
+ * (meaning the user's chosen [AccentColor] should be used instead).
+ */
+fun AppPreset.toPalette(): AccentPalette? = when (this) {
+    AppPreset.NONE     -> null
+    AppPreset.MIDNIGHT -> AccentPalette(Color(0xFF3949AB), Color(0xFF1A237E), Color(0xFF00E5FF))
+    AppPreset.FOREST   -> AccentPalette(Color(0xFF43A047), Color(0xFF1B5E20), Color(0xFFA5D6A7))
+    AppPreset.SAKURA   -> AccentPalette(Color(0xFFE91E63), Color(0xFF880E4F), Color(0xFFF48FB1))
+    AppPreset.OCEAN    -> AccentPalette(Color(0xFF0288D1), Color(0xFF01579B), Color(0xFF4DD0E1))
+    AppPreset.SUNSET   -> AccentPalette(Color(0xFFFF7043), Color(0xFFBF360C), Color(0xFFFFD54F))
+    AppPreset.NOIR     -> AccentPalette(Color(0xFF757575), Color(0xFF424242), Color(0xFFBDBDBD))
 }

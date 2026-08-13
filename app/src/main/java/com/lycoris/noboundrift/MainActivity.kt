@@ -40,11 +40,14 @@ class MainActivity : ComponentActivity() {
                 .collectAsState(initial = appearancePreferences.getAccentColor())
             val appFont by appearancePreferences.observeAppFont()
                 .collectAsState(initial = appearancePreferences.getAppFont())
+            val appPreset by appearancePreferences.observeAppPreset()
+                .collectAsState(initial = appearancePreferences.getAppPreset())
 
             NoBoundRiftTheme(
                 appTheme = appTheme,
                 accentColor = accentColor,
                 appFont = appFont,
+                appPreset = appPreset,
             ) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     NoBoundRiftNavHost()

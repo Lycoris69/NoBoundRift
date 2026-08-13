@@ -30,6 +30,16 @@ enum class AppFont(val displayName: String) {
     SERIF("Serif"),
 }
 
+enum class AppPreset(val displayName: String) {
+    NONE("None"),
+    MIDNIGHT("Midnight"),
+    FOREST("Forest"),
+    SAKURA("Sakura"),
+    OCEAN("Ocean"),
+    SUNSET("Sunset"),
+    NOIR("Noir"),
+}
+
 @Singleton
 class AppearancePreferences @Inject constructor(private val prefs: SharedPreferences) {
 
@@ -37,9 +47,13 @@ class AppearancePreferences @Inject constructor(private val prefs: SharedPrefere
         const val KEY_APP_THEME = "app_theme"
         const val KEY_ACCENT_COLOR = "accent_color"
         const val KEY_APP_FONT = "app_font"
+        const val KEY_APP_PRESET = "app_preset"
+        const val KEY_HIDE_BAR_LABELS = "hide_bottom_bar_labels"
         val DEFAULT_THEME = AppTheme.DARK
         val DEFAULT_ACCENT = AccentColor.VIOLET
         val DEFAULT_FONT = AppFont.DEFAULT
+        val DEFAULT_PRESET = AppPreset.NONE
+        const val DEFAULT_HIDE_LABELS = false
     }
 
     // ── Theme ─────────────────────────────────────────────────────────────────
@@ -97,6 +111,43 @@ class AppearancePreferences @Inject constructor(private val prefs: SharedPrefere
         trySend(getAppFont())
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == KEY_APP_FONT) trySend(getAppFont())
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }.distinctUntilChanged()
+
+    // ── Preset theme ──────────────────────────────────────────────────────────
+
+    fun getAppPreset(): AppPreset =
+        prefs.getString(KEY_APP_PRESET, DEFAULT_PRESET.name)
+            ?.let { runCatching { AppPreset.valueOf(it) }.getOrDefault(DEFAULT_PRESET) }
+            ?: DEFAULT_PRESET
+
+    fun setAppPreset(preset: AppPreset) {
+        prefs.edit().putString(KEY_APP_PRESET, preset.name).apply()
+    }
+
+    fun observeAppPreset(): Flow<AppPreset> = callbackFlow {
+        trySend(getAppPreset())
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == KEY_APP_PRESET) trySend(getAppPreset())
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }.distinctUntilChanged()
+
+    // ── Hide bottom bar labels ─────────────────────────────────────────────────
+
+    fun getHideBottomBarLabels(): Boolean = prefs.getBoolean(KEY_HIDE_BAR_LABELS, DEFAULT_HIDE_LABELS)
+
+    fun setHideBottomBarLabels(hide: Boolean) {
+        prefs.edit().putBoolean(KEY_HIDE_BAR_LABELS, hide).apply()
+    }
+
+    fun observeHideBottomBarLabels(): Flow<Boolean> = callbackFlow {
+        trySend(getHideBottomBarLabels())
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == KEY_HIDE_BAR_LABELS) trySend(getHideBottomBarLabels())
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
         awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }

@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import com.lycoris.noboundrift.data.local.AccentColor
 import com.lycoris.noboundrift.data.local.AppFont
+import com.lycoris.noboundrift.data.local.AppPreset
 import com.lycoris.noboundrift.data.local.AppTheme
 
 /**
@@ -30,6 +31,7 @@ fun NoBoundRiftTheme(
     appTheme: AppTheme = AppTheme.DARK,
     accentColor: AccentColor = AccentColor.VIOLET,
     appFont: AppFont = AppFont.DEFAULT,
+    appPreset: AppPreset = AppPreset.NONE,
     content: @Composable () -> Unit,
 ) {
     val systemDark = isSystemInDarkTheme()
@@ -39,7 +41,7 @@ fun NoBoundRiftTheme(
         AppTheme.SYSTEM -> systemDark
     }
 
-    val palette = accentColor.toPalette()
+    val palette = appPreset.toPalette() ?: accentColor.toPalette()
 
     val colorScheme = if (isDark) {
         darkColorScheme(

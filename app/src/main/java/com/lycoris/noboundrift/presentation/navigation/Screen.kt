@@ -39,6 +39,7 @@ sealed class Screen(val route: String) {
     data object SettingsLibrary : Screen("settings/library")
     data object SettingsDownloads : Screen("settings/downloads")
     data object SettingsNavigation : Screen("settings/navigation_prefs")
+    data object SettingsAccessibility : Screen("settings/accessibility")
 }
 
 fun String.encodeForNav(): String = java.net.URLEncoder.encode(this, "UTF-8").replace("+", "%20")

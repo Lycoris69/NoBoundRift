@@ -34,6 +34,7 @@ import com.lycoris.noboundrift.presentation.settings.SettingsAppearanceScreen
 import com.lycoris.noboundrift.presentation.settings.SettingsBrowseScreen
 import com.lycoris.noboundrift.presentation.settings.SettingsDownloadsScreen
 import com.lycoris.noboundrift.presentation.settings.SettingsLibraryScreen
+import com.lycoris.noboundrift.presentation.settings.SettingsAccessibilityScreen
 import com.lycoris.noboundrift.presentation.settings.SettingsNavigationScreen
 import com.lycoris.noboundrift.presentation.settings.SettingsReaderScreen
 import com.lycoris.noboundrift.presentation.settings.SettingsScreen
@@ -52,6 +53,7 @@ fun NoBoundRiftNavHost(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val showDiscover by viewModel.showDiscoverTab.collectAsStateWithLifecycle()
+    val hideBottomBarLabels by viewModel.hideBottomBarLabels.collectAsStateWithLifecycle()
 
     // If the user is currently on the Discover screen and they toggle it off,
     // redirect them to Browse so they don't stay on a "hidden" destination.
@@ -122,7 +124,7 @@ fun NoBoundRiftNavHost(
                                 }
                             },
                             icon = item.icon,
-                            label = { Text(item.label) },
+                            label = if (hideBottomBarLabels) null else ({ Text(item.label) }),
                         )
                     }
                 }
@@ -219,6 +221,7 @@ fun NoBoundRiftNavHost(
                     onNavigateToLibrary = { navController.navigate(Screen.SettingsLibrary.route) },
                     onNavigateToDownloads = { navController.navigate(Screen.SettingsDownloads.route) },
                     onNavigateToNavigation = { navController.navigate(Screen.SettingsNavigation.route) },
+                    onNavigateToAccessibility = { navController.navigate(Screen.SettingsAccessibility.route) },
                 )
             }
             composable(Screen.SettingsAppearance.route) {
@@ -238,6 +241,9 @@ fun NoBoundRiftNavHost(
             }
             composable(Screen.SettingsNavigation.route) {
                 SettingsNavigationScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.SettingsAccessibility.route) {
+                SettingsAccessibilityScreen(onBack = { navController.popBackStack() })
             }
         }
     }
