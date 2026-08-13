@@ -127,7 +127,53 @@ private fun LibraryGrid(
         contentPadding = PaddingValues(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxSize(),
+        // Gesture lives on the CONTAINER, not on individual items. This prevents
+        // Compose from cancelling the ongoing drag when an item moves to a new
+        // grid slot after onMove() triggers recomposition — the container is stable.
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = { offset ->
+                        // Start drag only when touch lands directly on an item.
+                        val hit = gridState.layoutInfo.visibleItemsInfo.firstOrNull { info ->
+                            offset.x >= info.offset.x &&
+                                offset.x < info.offset.x + info.size.width &&
+                                offset.y >= info.offset.y &&
+                                offset.y < info.offset.y + info.size.height
+                        }
+                        if (hit != null) {
+                            draggingIndex = hit.index
+                            touchPosInViewport = offset
+                        }
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        val currentDragging = draggingIndex ?: return@detectDragGesturesAfterLongPress
+                        touchPosInViewport += dragAmount
+                        // Closest-centre search: immune to inter-item gaps and the
+                        // fact that layoutInfo may reflect a frame behind the
+                        // optimistic reorder while animateItem() is running.
+                        val target = gridState.layoutInfo.visibleItemsInfo.minByOrNull { info ->
+                            val dx = touchPosInViewport.x - (info.offset.x + info.size.width / 2f)
+                            val dy = touchPosInViewport.y - (info.offset.y + info.size.height / 2f)
+                            dx * dx + dy * dy
+                        }
+                        if (target != null && target.index != currentDragging) {
+                            viewModel.onMove(currentDragging, target.index)
+                            draggingIndex = target.index
+                        }
+                    },
+                    onDragEnd = {
+                        if (draggingIndex != null) viewModel.onDragEnd()
+                        draggingIndex = null
+                    },
+                    onDragCancel = {
+                        if (draggingIndex != null) viewModel.onDragEnd()
+                        draggingIndex = null
+                    },
+                )
+            },
     ) {
         itemsIndexed(
             items = uiState.manga,
@@ -150,51 +196,13 @@ private fun LibraryGrid(
                             scaleY = 1.05f
                             shadowElevation = 16f
                         }
-                    }
-                    .pointerInput(preview.id) {
-                        detectDragGesturesAfterLongPress(
-                            onDragStart = { offsetWithinItem ->
-                                // Compute the touch position in the grid's scroll viewport
-                                val itemInfo = gridState.layoutInfo.visibleItemsInfo
-                                    .firstOrNull { it.index == index }
-                                if (itemInfo != null) {
-                                    draggingIndex = index
-                                    touchPosInViewport = Offset(
-                                        x = itemInfo.offset.x + offsetWithinItem.x,
-                                        y = itemInfo.offset.y + offsetWithinItem.y,
-                                    )
-                                }
-                            },
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                touchPosInViewport += dragAmount
-                                val currentDragging = draggingIndex ?: return@detectDragGesturesAfterLongPress
-                                val target = gridState.layoutInfo.visibleItemsInfo.firstOrNull { info ->
-                                    touchPosInViewport.x >= info.offset.x &&
-                                        touchPosInViewport.x < info.offset.x + info.size.width &&
-                                        touchPosInViewport.y >= info.offset.y &&
-                                        touchPosInViewport.y < info.offset.y + info.size.height
-                                }
-                                if (target != null && target.index != currentDragging) {
-                                    viewModel.onMove(currentDragging, target.index)
-                                    draggingIndex = target.index
-                                }
-                            },
-                            onDragEnd = {
-                                draggingIndex = null
-                                viewModel.onDragEnd()
-                            },
-                            onDragCancel = {
-                                draggingIndex = null
-                                viewModel.onDragEnd()
-                            },
-                        )
                     },
             )
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun LibraryList(
     uiState: LibraryUiState,
@@ -207,7 +215,46 @@ private fun LibraryList(
 
     LazyColumn(
         state = listState,
-        modifier = Modifier.fillMaxSize(),
+        // Gesture lives on the CONTAINER so it is never cancelled when an item
+        // moves to a different list slot after onMove() recomposes the list.
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = { offset ->
+                        val hit = listState.layoutInfo.visibleItemsInfo.firstOrNull { info ->
+                            offset.y >= info.offset && offset.y < info.offset + info.size
+                        }
+                        if (hit != null) {
+                            draggingIndex = hit.index
+                            touchYInViewport = offset.y
+                        }
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        val currentDragging = draggingIndex ?: return@detectDragGesturesAfterLongPress
+                        touchYInViewport += dragAmount.y
+                        // Closest-centre search (y-axis) — handles item gaps and
+                        // layout frames that may lag behind the optimistic reorder.
+                        val target = listState.layoutInfo.visibleItemsInfo.minByOrNull { info ->
+                            val cy = info.offset + info.size / 2f
+                            kotlin.math.abs(touchYInViewport - cy)
+                        }
+                        if (target != null && target.index != currentDragging) {
+                            viewModel.onMove(currentDragging, target.index)
+                            draggingIndex = target.index
+                        }
+                    },
+                    onDragEnd = {
+                        if (draggingIndex != null) viewModel.onDragEnd()
+                        draggingIndex = null
+                    },
+                    onDragCancel = {
+                        if (draggingIndex != null) viewModel.onDragEnd()
+                        draggingIndex = null
+                    },
+                )
+            },
         contentPadding = PaddingValues(vertical = 4.dp),
     ) {
         itemsIndexed(uiState.manga, key = { _, preview -> preview.id }) { index, preview ->
@@ -216,6 +263,7 @@ private fun LibraryList(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .animateItem()
                     .zIndex(if (isDragging) 1f else 0f)
                     .graphicsLayer {
                         if (isDragging) {
@@ -225,39 +273,7 @@ private fun LibraryList(
                         }
                     }
                     .clickable { if (draggingIndex == null) onMangaClick(preview) }
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .pointerInput(preview.id) {
-                        detectDragGesturesAfterLongPress(
-                            onDragStart = { offsetWithinItem ->
-                                val itemInfo = listState.layoutInfo.visibleItemsInfo
-                                    .firstOrNull { it.index == index }
-                                if (itemInfo != null) {
-                                    draggingIndex = index
-                                    touchYInViewport = itemInfo.offset + offsetWithinItem.y
-                                }
-                            },
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                touchYInViewport += dragAmount.y
-                                val currentDragging = draggingIndex ?: return@detectDragGesturesAfterLongPress
-                                val target = listState.layoutInfo.visibleItemsInfo.firstOrNull { info ->
-                                    touchYInViewport >= info.offset && touchYInViewport < info.offset + info.size
-                                }
-                                if (target != null && target.index != currentDragging) {
-                                    viewModel.onMove(currentDragging, target.index)
-                                    draggingIndex = target.index
-                                }
-                            },
-                            onDragEnd = {
-                                draggingIndex = null
-                                viewModel.onDragEnd()
-                            },
-                            onDragCancel = {
-                                draggingIndex = null
-                                viewModel.onDragEnd()
-                            },
-                        )
-                    },
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
