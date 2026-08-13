@@ -34,6 +34,11 @@ Personal Android manga and webtoon reader. Content is sourced by scraping third-
 - **Parallel downloads** — configurable concurrency (1–20 chapters at a time) in Settings
 - **Offline fallback** — Detail screen builds from local downloads when the network is unavailable
 
+### Appearance
+- **Theme** — Dark (default), AMOLED (true black), Light, or follow System; changes take effect instantly
+- **Accent colour** — 6 preset palettes (Violet, Blue, Teal, Green, Rose, Orange) shown as inline swatches; tap to switch
+- **Font** — Default (Roboto) or Serif for all UI text
+
 ### Browse & Discovery
 - Browse and search manga/webtoon across 8 sources
 - Refresh button in the Browse search bar to re-run the current search
