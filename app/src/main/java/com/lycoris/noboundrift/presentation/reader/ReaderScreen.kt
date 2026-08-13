@@ -77,6 +77,7 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Dimension
 import coil.size.Size as CoilSize
+import com.lycoris.noboundrift.data.local.ReadingDirection
 import com.lycoris.noboundrift.domain.model.Chapter
 import com.lycoris.noboundrift.domain.model.Page
 
@@ -122,6 +123,19 @@ fun ReaderScreen(
                 val controller = androidx.core.view.WindowCompat.getInsetsController(activity.window, view)
                 controller.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
             }
+        }
+    }
+
+    // Keep screen on while reading if the user has enabled the preference
+    val activity = context as? android.app.Activity
+    DisposableEffect(uiState.keepScreenOn) {
+        if (uiState.keepScreenOn) {
+            activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose {
+            activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
     }
 
@@ -178,6 +192,7 @@ fun ReaderScreen(
                             pages = uiState.pages,
                             imageRetryKey = uiState.imageRetryKey,
                             currentPage = uiState.currentPageIndex,
+                            readingDirection = uiState.readingDirection,
                             onPageChanged = viewModel::onPageChanged,
                             onNearEnd = viewModel::onNearEnd,
                             modifier = centerClickModifier,
@@ -300,6 +315,7 @@ private fun PageFlipReader(
     pages: List<Page>,
     imageRetryKey: Int,
     currentPage: Int,
+    readingDirection: ReadingDirection,
     onPageChanged: (Int) -> Unit,
     onNearEnd: () -> Unit,
     modifier: Modifier = Modifier,
@@ -322,6 +338,7 @@ private fun PageFlipReader(
 
     HorizontalPager(
         state = pagerState,
+        reverseLayout = readingDirection == ReadingDirection.RTL,
         modifier = modifier.fillMaxSize(),
     ) { pageIndex ->
         pages.getOrNull(pageIndex)?.let { page ->

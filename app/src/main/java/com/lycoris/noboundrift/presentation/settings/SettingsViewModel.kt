@@ -13,6 +13,7 @@ import com.lycoris.noboundrift.data.local.LibraryPreferences
 import com.lycoris.noboundrift.data.local.NavigationPreferences
 import com.lycoris.noboundrift.data.local.PreloadMode
 import com.lycoris.noboundrift.data.local.ReaderPreferences
+import com.lycoris.noboundrift.data.local.ReadingDirection
 import com.lycoris.noboundrift.data.local.SourcePreferences
 import com.lycoris.noboundrift.data.remote.source.Source
 import com.lycoris.noboundrift.data.remote.source.SourceManager
@@ -34,6 +35,8 @@ data class SettingsUiState(
     val appTheme: AppTheme = AppearancePreferences.DEFAULT_THEME,
     val accentColor: AccentColor = AppearancePreferences.DEFAULT_ACCENT,
     val appFont: AppFont = AppearancePreferences.DEFAULT_FONT,
+    val readingDirection: ReadingDirection = ReadingDirection.LTR,
+    val keepScreenOn: Boolean = false,
 )
 
 @HiltViewModel
@@ -48,8 +51,8 @@ class SettingsViewModel @Inject constructor(
     private val appearancePreferences: AppearancePreferences,
 ) : ViewModel() {
 
-    // combine() supports up to 5 typed flows per call. We have 9 total, so we nest two
-    // inner combines (5 + 4) and merge their results in a third outer combine.
+    // combine() supports up to 5 typed flows per call. We have 11 total, so we nest three
+    // inner combines (5 + 4 + 2) and merge their results in a fourth outer combine.
     val uiState: StateFlow<SettingsUiState> = combine(
         // ── inner 1: reader / library / downloads ──────────────────────────────
         combine(
@@ -70,7 +73,14 @@ class SettingsViewModel @Inject constructor(
         ) { showDiscover, appTheme, accentColor, appFont ->
             AppearancePartial(showDiscover, appTheme, accentColor, appFont)
         },
-    ) { partial, appearance ->
+        // ── inner 3: new reader prefs ──────────────────────────────────────────
+        combine(
+            readerPreferences.observeReadingDirection(),
+            readerPreferences.observeKeepScreenOn(),
+        ) { readingDirection, keepScreenOn ->
+            ReaderExtrasPartial(readingDirection, keepScreenOn)
+        },
+    ) { partial, appearance, readerExtras ->
         SettingsUiState(
             sources = sourceManager.getAllSources().sortedBy { it.id },
             selectedSourceId = partial.selectedSourceId,
@@ -82,6 +92,8 @@ class SettingsViewModel @Inject constructor(
             appTheme = appearance.appTheme,
             accentColor = appearance.accentColor,
             appFont = appearance.appFont,
+            readingDirection = readerExtras.readingDirection,
+            keepScreenOn = readerExtras.keepScreenOn,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -94,6 +106,8 @@ class SettingsViewModel @Inject constructor(
     fun setAppTheme(theme: AppTheme) { appearancePreferences.setAppTheme(theme) }
     fun setAccentColor(color: AccentColor) { appearancePreferences.setAccentColor(color) }
     fun setAppFont(font: AppFont) { appearancePreferences.setAppFont(font) }
+    fun setReadingDirection(dir: ReadingDirection) { readerPreferences.setReadingDirection(dir) }
+    fun setKeepScreenOn(enabled: Boolean) { readerPreferences.setKeepScreenOn(enabled) }
 }
 
 /** Intermediate tuple for the first inner [combine] in [SettingsViewModel.uiState]. */
@@ -111,4 +125,10 @@ private data class AppearancePartial(
     val appTheme: AppTheme,
     val accentColor: AccentColor,
     val appFont: AppFont,
+)
+
+/** Intermediate tuple for the third inner [combine] in [SettingsViewModel.uiState]. */
+private data class ReaderExtrasPartial(
+    val readingDirection: ReadingDirection,
+    val keepScreenOn: Boolean,
 )

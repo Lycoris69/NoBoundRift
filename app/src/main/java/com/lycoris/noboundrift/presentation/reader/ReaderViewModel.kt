@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lycoris.noboundrift.data.local.PreloadMode
 import com.lycoris.noboundrift.data.local.ReaderPreferences
+import com.lycoris.noboundrift.data.local.ReadingDirection
 import com.lycoris.noboundrift.domain.model.Chapter
 import com.lycoris.noboundrift.domain.model.Page
 import com.lycoris.noboundrift.domain.repository.MangaRepository
@@ -54,6 +55,8 @@ data class ReaderUiState(
     // Computed in the ViewModel (needs chapterSegments) and pushed here to avoid re-deriving it
     // in the UI, where chapterSegments is not visible.
     val chapterProgressPercent: Int = 0,
+    val readingDirection: ReadingDirection = ReadingDirection.LTR,
+    val keepScreenOn: Boolean = false,
 )
 
 @HiltViewModel
@@ -80,6 +83,8 @@ class ReaderViewModel @Inject constructor(
                 ?.decodeFromNav()
                 .orEmpty(),
             currentChapterUrl = chapterUrl,
+            readingDirection = readerPreferences.getReadingDirection(),
+            keepScreenOn = readerPreferences.getKeepScreenOn(),
         )
     )
     val uiState: StateFlow<ReaderUiState> = _uiState.asStateFlow()
@@ -101,11 +106,24 @@ class ReaderViewModel @Inject constructor(
     init {
         loadPages()
         resolveNextChapter()
+        viewModelScope.launch {
+            readerPreferences.observeReadingDirection().collect { dir ->
+                _uiState.update { it.copy(readingDirection = dir) }
+            }
+        }
+        viewModelScope.launch {
+            readerPreferences.observeKeepScreenOn().collect { keepOn ->
+                _uiState.update { it.copy(keepScreenOn = keepOn) }
+            }
+        }
     }
 
     fun toggleReaderMode() {
         _uiState.update { it.copy(readerMode = it.readerMode.toggle()) }
     }
+
+    fun setReadingDirection(dir: ReadingDirection) { readerPreferences.setReadingDirection(dir) }
+    fun setKeepScreenOn(enabled: Boolean) { readerPreferences.setKeepScreenOn(enabled) }
 
     fun toggleChrome() {
         _uiState.update { it.copy(showChrome = !it.showChrome) }

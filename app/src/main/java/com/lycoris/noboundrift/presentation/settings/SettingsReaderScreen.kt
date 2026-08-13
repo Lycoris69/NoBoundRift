@@ -26,6 +26,7 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -39,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lycoris.noboundrift.data.local.PreloadMode
+import com.lycoris.noboundrift.data.local.ReadingDirection
 
 private val CACHE_SIZE_OPTIONS = listOf(
     64L * 1024 * 1024 to "64 MB",
@@ -144,6 +146,43 @@ fun SettingsReaderScreen(
                     )
                 },
                 modifier = Modifier.clickable { showCacheSizeDialog = true },
+            )
+            HorizontalDivider()
+            // Reading Direction — segmented button
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            ) {
+                Text("Reading Direction", style = MaterialTheme.typography.bodyLarge)
+                Spacer(Modifier.height(8.dp))
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                        selected = uiState.readingDirection == ReadingDirection.LTR,
+                        onClick = { viewModel.setReadingDirection(ReadingDirection.LTR) },
+                        label = { Text("LTR") },
+                    )
+                    SegmentedButton(
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                        selected = uiState.readingDirection == ReadingDirection.RTL,
+                        onClick = { viewModel.setReadingDirection(ReadingDirection.RTL) },
+                        label = { Text("RTL") },
+                    )
+                }
+            }
+            HorizontalDivider()
+            // Keep Screen On — switch
+            ListItem(
+                headlineContent = { Text("Keep Screen On") },
+                supportingContent = { Text("Prevents screen from sleeping while reading") },
+                trailingContent = {
+                    Switch(
+                        checked = uiState.keepScreenOn,
+                        onCheckedChange = viewModel::setKeepScreenOn,
+                    )
+                },
+                modifier = Modifier.clickable { viewModel.setKeepScreenOn(!uiState.keepScreenOn) },
             )
         }
     }
