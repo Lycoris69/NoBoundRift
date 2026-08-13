@@ -13,15 +13,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import kotlin.math.roundToInt
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -111,6 +115,49 @@ fun SettingsBrowseScreen(
                     )
                 },
                 modifier = Modifier.clickable { showSourceDialog = true },
+            )
+
+            HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
+
+            // Grid columns slider (2–5)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Grid Columns",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = "${uiState.browseGridColumns}",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Slider(
+                    value = uiState.browseGridColumns.toFloat(),
+                    onValueChange = { viewModel.setBrowseGridColumns(it.roundToInt()) },
+                    valueRange = 2f..5f,
+                    steps = 2,
+                )
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
+
+            // Blur covers (parental control — shared with Library)
+            ListItem(
+                headlineContent = { Text("Blur Covers") },
+                supportingContent = { Text("Hides all cover images") },
+                trailingContent = {
+                    Switch(
+                        checked = uiState.blurCovers,
+                        onCheckedChange = viewModel::setBlurCovers,
+                    )
+                },
+                modifier = Modifier.clickable { viewModel.setBlurCovers(!uiState.blurCovers) },
             )
         }
     }

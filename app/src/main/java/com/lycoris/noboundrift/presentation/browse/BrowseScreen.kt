@@ -237,7 +237,7 @@ private fun BrowseGrid(
 
     LazyVerticalGrid(
         state = gridState,
-        columns = GridCells.Adaptive(minSize = 120.dp),
+        columns = GridCells.Fixed(uiState.browseGridColumns),
         contentPadding = PaddingValues(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -261,30 +261,31 @@ private fun BrowseGrid(
                     preview = preview,
                     onClick = { onMangaClick(preview) },
                     sourceLabel = allSourceNames[preview.sourceId],
+                    blurred = uiState.blurCovers,
                 )
             }
         } else if (groups != null) {
             if (groups.today.isNotEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) { DateSectionHeader("Today") }
                 items(groups.today, key = { it.id }) { preview ->
-                    MangaCard(preview = preview, onClick = { onMangaClick(preview) })
+                    MangaCard(preview = preview, onClick = { onMangaClick(preview) }, blurred = uiState.blurCovers)
                 }
             }
             if (groups.lastThreeDays.isNotEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) { DateSectionHeader("Last 3 Days") }
                 items(groups.lastThreeDays, key = { it.id }) { preview ->
-                    MangaCard(preview = preview, onClick = { onMangaClick(preview) })
+                    MangaCard(preview = preview, onClick = { onMangaClick(preview) }, blurred = uiState.blurCovers)
                 }
             }
             if (groups.before.isNotEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) { DateSectionHeader("Before") }
                 items(groups.before, key = { it.id }) { preview ->
-                    MangaCard(preview = preview, onClick = { onMangaClick(preview) })
+                    MangaCard(preview = preview, onClick = { onMangaClick(preview) }, blurred = uiState.blurCovers)
                 }
             }
         } else {
             items(uiState.manga, key = { it.id }) { preview ->
-                MangaCard(preview = preview, onClick = { onMangaClick(preview) })
+                MangaCard(preview = preview, onClick = { onMangaClick(preview) }, blurred = uiState.blurCovers)
             }
         }
 

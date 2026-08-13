@@ -123,7 +123,7 @@ private fun LibraryGrid(
 
     LazyVerticalGrid(
         state = gridState,
-        columns = GridCells.Adaptive(minSize = 120.dp),
+        columns = GridCells.Fixed(uiState.libraryGridColumns),
         contentPadding = PaddingValues(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -139,6 +139,8 @@ private fun LibraryGrid(
                 onClick = { if (draggingIndex == null) onMangaClick(preview) },
                 showNewBadge = !isDragging &&
                     preview.latestChapterAt > System.currentTimeMillis() - NEW_CHAPTER_WINDOW_MS && !preview.isLatestChapterRead,
+                blurred = uiState.blurCovers,
+                cornerRadius = if (uiState.roundedCovers) 8.dp else 0.dp,
                 modifier = Modifier
                     .animateItem()
                     .zIndex(if (isDragging) 1f else 0f)

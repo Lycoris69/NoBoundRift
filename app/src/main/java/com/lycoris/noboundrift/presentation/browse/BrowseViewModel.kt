@@ -3,6 +3,7 @@ package com.lycoris.noboundrift.presentation.browse
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lycoris.noboundrift.data.local.BrowsePreferences
 import com.lycoris.noboundrift.data.local.EmptyChapterCache
 import com.lycoris.noboundrift.data.local.SourcePreferences
 import com.lycoris.noboundrift.data.remote.source.SourceManager
@@ -44,6 +45,8 @@ data class BrowseUiState(
      * in source order, preventing DB-enriched dates from scrambling the list.
      */
     val showDateGroups: Boolean = true,
+    val browseGridColumns: Int = 3,
+    val blurCovers: Boolean = false,
 )
 
 @HiltViewModel
@@ -54,6 +57,7 @@ class BrowseViewModel @Inject constructor(
     private val repository: MangaRepository,
     private val sourceManager: SourceManager,
     private val emptyChapterCache: EmptyChapterCache,
+    private val browsePreferences: BrowsePreferences,
 ) : ViewModel() {
 
     val allSourceNames: Map<Long, String> = sourceManager.getAllSources().associate { it.id to it.name }
@@ -75,6 +79,18 @@ class BrowseViewModel @Inject constructor(
     val uiState: StateFlow<BrowseUiState> = _uiState.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            browsePreferences.observeGridColumns().collect { cols ->
+                _uiState.update { it.copy(browseGridColumns = cols) }
+            }
+        }
+
+        viewModelScope.launch {
+            browsePreferences.observeBlurCovers().collect { blur ->
+                _uiState.update { it.copy(blurCovers = blur) }
+            }
+        }
+
         viewModelScope.launch {
             var initialized = false
             sourcePreferences.observeSelectedSourceId().collect { newSourceId ->

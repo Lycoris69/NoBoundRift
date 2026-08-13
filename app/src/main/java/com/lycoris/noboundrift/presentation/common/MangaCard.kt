@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.lycoris.noboundrift.domain.model.MangaPreview
@@ -35,12 +36,14 @@ fun MangaCard(
     modifier: Modifier = Modifier,
     showNewBadge: Boolean = false,
     sourceLabel: String? = null,
+    blurred: Boolean = false,
+    cornerRadius: Dp = 8.dp,
 ) {
     Card(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(cornerRadius),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Box {
@@ -52,6 +55,15 @@ fun MangaCard(
                     .fillMaxWidth()
                     .aspectRatio(2f / 3f),
             )
+            // Dark overlay used as parental-control blur (Modifier.blur requires API 31; min is 26)
+            if (blurred) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(2f / 3f)
+                        .background(Color.Black.copy(alpha = 0.88f))
+                )
+            }
             Box(
                 modifier = Modifier
                     .fillMaxWidth()

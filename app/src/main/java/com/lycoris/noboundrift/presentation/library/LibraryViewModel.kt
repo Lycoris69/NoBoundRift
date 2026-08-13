@@ -2,8 +2,10 @@ package com.lycoris.noboundrift.presentation.library
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lycoris.noboundrift.data.local.BrowsePreferences
 import com.lycoris.noboundrift.data.local.LibraryLayout
 import com.lycoris.noboundrift.data.local.LibraryPreferences
+import com.lycoris.noboundrift.data.local.LibrarySortOrder
 import com.lycoris.noboundrift.data.local.entity.DownloadEntity
 import com.lycoris.noboundrift.data.local.entity.DownloadStatus
 import com.lycoris.noboundrift.domain.model.MangaPreview
@@ -45,6 +47,10 @@ data class LibraryUiState(
     val selectedTab: LibraryTab = LibraryTab.LIBRARY,
     val downloadGroups: List<MangaDownloadGroup> = emptyList(),
     val libraryLayout: LibraryLayout = LibraryLayout.GRID,
+    val libraryGridColumns: Int = 3,
+    val librarySortOrder: LibrarySortOrder = LibrarySortOrder.CUSTOM,
+    val roundedCovers: Boolean = true,
+    val blurCovers: Boolean = false,
 )
 
 @HiltViewModel
@@ -53,12 +59,20 @@ class LibraryViewModel @Inject constructor(
     private val repository: MangaRepository,
     getDownloads: GetDownloadsUseCase,
     libraryPreferences: LibraryPreferences,
+    private val browsePreferences: BrowsePreferences,
     private val deleteDownloadUseCase: DeleteDownloadUseCase,
     private val cancelAllDownloadsUseCase: CancelAllDownloadsUseCase,
     private val downloadRepository: DownloadRepository,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(LibraryUiState())
+    private val _uiState = MutableStateFlow(
+        LibraryUiState(
+            libraryGridColumns = libraryPreferences.getGridColumns(),
+            librarySortOrder = libraryPreferences.getSortOrder(),
+            roundedCovers = libraryPreferences.isRoundedCovers(),
+            blurCovers = browsePreferences.isBlurCovers(),
+        )
+    )
     val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
 
     // Counter of in-flight reorder writes. DB Flow emissions are suppressed while > 0.
@@ -74,8 +88,12 @@ class LibraryViewModel @Inject constructor(
         viewModelScope.launch {
             getLibrary().collect { list ->
                 if (!suppressDbUpdates) {
-                    val sorted = list.sortedByDescending {
-                        it.latestChapterAt > System.currentTimeMillis() - 7L * 24 * 3600 * 1000 && !it.isLatestChapterRead
+                    val sorted = when (_uiState.value.librarySortOrder) {
+                        LibrarySortOrder.CUSTOM -> list.sortedByDescending {
+                            it.latestChapterAt > System.currentTimeMillis() - 7L * 24 * 3600 * 1000 && !it.isLatestChapterRead
+                        }
+                        LibrarySortOrder.TITLE -> list.sortedBy { it.title.lowercase() }
+                        LibrarySortOrder.UPDATED -> list.sortedByDescending { it.latestChapterAt }
                     }
                     _uiState.update { current ->
                         current.copy(manga = sorted, isEmpty = sorted.isEmpty())
@@ -87,6 +105,30 @@ class LibraryViewModel @Inject constructor(
         viewModelScope.launch {
             libraryPreferences.observeLibraryLayout().collect { layout ->
                 _uiState.update { it.copy(libraryLayout = layout) }
+            }
+        }
+
+        viewModelScope.launch {
+            libraryPreferences.observeGridColumns().collect { cols ->
+                _uiState.update { it.copy(libraryGridColumns = cols) }
+            }
+        }
+
+        viewModelScope.launch {
+            libraryPreferences.observeSortOrder().collect { order ->
+                _uiState.update { it.copy(librarySortOrder = order) }
+            }
+        }
+
+        viewModelScope.launch {
+            libraryPreferences.observeRoundedCovers().collect { rounded ->
+                _uiState.update { it.copy(roundedCovers = rounded) }
+            }
+        }
+
+        viewModelScope.launch {
+            browsePreferences.observeBlurCovers().collect { blur ->
+                _uiState.update { it.copy(blurCovers = blur) }
             }
         }
 
