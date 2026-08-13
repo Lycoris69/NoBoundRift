@@ -30,6 +30,15 @@ sealed class Screen(val route: String) {
     data object Recommendation : Screen("recommendation")
 
     data object Settings : Screen("settings")
+
+    // Settings sub-screens — each is a full nav destination so the bottom bar
+    // hides automatically (their routes don't match the four root-tab routes).
+    data object SettingsAppearance : Screen("settings/appearance")
+    data object SettingsBrowse : Screen("settings/browse")
+    data object SettingsReader : Screen("settings/reader")
+    data object SettingsLibrary : Screen("settings/library")
+    data object SettingsDownloads : Screen("settings/downloads")
+    data object SettingsNavigation : Screen("settings/navigation_prefs")
 }
 
 fun String.encodeForNav(): String = java.net.URLEncoder.encode(this, "UTF-8").replace("+", "%20")

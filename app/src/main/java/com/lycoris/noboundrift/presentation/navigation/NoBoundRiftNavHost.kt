@@ -30,6 +30,12 @@ import com.lycoris.noboundrift.presentation.recommendation.RecommendationScreen
 import com.lycoris.noboundrift.presentation.detail.DetailScreen
 import com.lycoris.noboundrift.presentation.library.LibraryScreen
 import com.lycoris.noboundrift.presentation.reader.ReaderScreen
+import com.lycoris.noboundrift.presentation.settings.SettingsAppearanceScreen
+import com.lycoris.noboundrift.presentation.settings.SettingsBrowseScreen
+import com.lycoris.noboundrift.presentation.settings.SettingsDownloadsScreen
+import com.lycoris.noboundrift.presentation.settings.SettingsLibraryScreen
+import com.lycoris.noboundrift.presentation.settings.SettingsNavigationScreen
+import com.lycoris.noboundrift.presentation.settings.SettingsReaderScreen
 import com.lycoris.noboundrift.presentation.settings.SettingsScreen
 
 private data class BottomNavItem(
@@ -206,7 +212,32 @@ fun NoBoundRiftNavHost(
             }
 
             composable(Screen.Settings.route) {
-                SettingsScreen()
+                SettingsScreen(
+                    onNavigateToAppearance = { navController.navigate(Screen.SettingsAppearance.route) },
+                    onNavigateToBrowse = { navController.navigate(Screen.SettingsBrowse.route) },
+                    onNavigateToReader = { navController.navigate(Screen.SettingsReader.route) },
+                    onNavigateToLibrary = { navController.navigate(Screen.SettingsLibrary.route) },
+                    onNavigateToDownloads = { navController.navigate(Screen.SettingsDownloads.route) },
+                    onNavigateToNavigation = { navController.navigate(Screen.SettingsNavigation.route) },
+                )
+            }
+            composable(Screen.SettingsAppearance.route) {
+                SettingsAppearanceScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.SettingsBrowse.route) {
+                SettingsBrowseScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.SettingsReader.route) {
+                SettingsReaderScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.SettingsLibrary.route) {
+                SettingsLibraryScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.SettingsDownloads.route) {
+                SettingsDownloadsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.SettingsNavigation.route) {
+                SettingsNavigationScreen(onBack = { navController.popBackStack() })
             }
         }
     }
