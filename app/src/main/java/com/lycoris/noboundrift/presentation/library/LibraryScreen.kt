@@ -39,7 +39,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -120,6 +123,10 @@ private fun LibraryGrid(
     val gridState = rememberLazyGridState()
     var draggingIndex by remember { mutableStateOf<Int?>(null) }
     var touchPosInViewport by remember { mutableStateOf(Offset.Zero) }
+    val haptic = LocalHapticFeedback.current
+    // rememberUpdatedState so the coroutine always sees the live setting even though
+    // pointerInput(Unit) never restarts when uiState.hapticFeedback changes.
+    val hapticEnabledState = rememberUpdatedState(uiState.hapticFeedback)
 
     LazyVerticalGrid(
         state = gridState,
@@ -143,6 +150,9 @@ private fun LibraryGrid(
                                 offset.y < info.offset.y + info.size.height
                         }
                         if (hit != null) {
+                            if (hapticEnabledState.value) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            }
                             draggingIndex = hit.index
                             touchPosInViewport = offset
                         }
@@ -212,6 +222,8 @@ private fun LibraryList(
     val listState = rememberLazyListState()
     var draggingIndex by remember { mutableStateOf<Int?>(null) }
     var touchYInViewport by remember { mutableStateOf(0f) }
+    val haptic = LocalHapticFeedback.current
+    val hapticEnabledState = rememberUpdatedState(uiState.hapticFeedback)
 
     LazyColumn(
         state = listState,
@@ -226,6 +238,9 @@ private fun LibraryList(
                             offset.y >= info.offset && offset.y < info.offset + info.size
                         }
                         if (hit != null) {
+                            if (hapticEnabledState.value) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            }
                             draggingIndex = hit.index
                             touchYInViewport = offset.y
                         }

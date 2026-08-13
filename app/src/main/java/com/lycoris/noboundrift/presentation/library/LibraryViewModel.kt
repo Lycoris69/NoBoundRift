@@ -2,6 +2,7 @@ package com.lycoris.noboundrift.presentation.library
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lycoris.noboundrift.data.local.AccessibilityPreferences
 import com.lycoris.noboundrift.data.local.BrowsePreferences
 import com.lycoris.noboundrift.data.local.LibraryLayout
 import com.lycoris.noboundrift.data.local.LibraryPreferences
@@ -51,6 +52,7 @@ data class LibraryUiState(
     val librarySortOrder: LibrarySortOrder = LibrarySortOrder.CUSTOM,
     val roundedCovers: Boolean = true,
     val blurCovers: Boolean = false,
+    val hapticFeedback: Boolean = true,
 )
 
 @HiltViewModel
@@ -60,6 +62,7 @@ class LibraryViewModel @Inject constructor(
     getDownloads: GetDownloadsUseCase,
     libraryPreferences: LibraryPreferences,
     private val browsePreferences: BrowsePreferences,
+    private val accessibilityPreferences: AccessibilityPreferences,
     private val deleteDownloadUseCase: DeleteDownloadUseCase,
     private val cancelAllDownloadsUseCase: CancelAllDownloadsUseCase,
     private val downloadRepository: DownloadRepository,
@@ -71,6 +74,7 @@ class LibraryViewModel @Inject constructor(
             librarySortOrder = libraryPreferences.getSortOrder(),
             roundedCovers = libraryPreferences.isRoundedCovers(),
             blurCovers = browsePreferences.isBlurCovers(),
+            hapticFeedback = accessibilityPreferences.isHapticFeedback(),
         )
     )
     val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
@@ -129,6 +133,12 @@ class LibraryViewModel @Inject constructor(
         viewModelScope.launch {
             browsePreferences.observeBlurCovers().collect { blur ->
                 _uiState.update { it.copy(blurCovers = blur) }
+            }
+        }
+
+        viewModelScope.launch {
+            accessibilityPreferences.observeHapticFeedback().collect { enabled ->
+                _uiState.update { it.copy(hapticFeedback = enabled) }
             }
         }
 

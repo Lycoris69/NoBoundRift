@@ -18,6 +18,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
@@ -28,6 +30,7 @@ fun SettingsAccessibilityScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val haptic = LocalHapticFeedback.current
 
     Scaffold(
         topBar = {
@@ -52,10 +55,19 @@ fun SettingsAccessibilityScreen(
                 trailingContent = {
                     Switch(
                         checked = uiState.hapticFeedback,
-                        onCheckedChange = viewModel::setHapticFeedback,
+                        onCheckedChange = { enabled ->
+                            viewModel.setHapticFeedback(enabled)
+                            // Fire a confirmation pulse so the user immediately feels
+                            // that haptics are on (no pulse when turning it off).
+                            if (enabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        },
                     )
                 },
-                modifier = Modifier.clickable { viewModel.setHapticFeedback(!uiState.hapticFeedback) },
+                modifier = Modifier.clickable {
+                    val next = !uiState.hapticFeedback
+                    viewModel.setHapticFeedback(next)
+                    if (next) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                },
             )
         }
     }
