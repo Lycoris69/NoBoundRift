@@ -183,8 +183,17 @@ class ReaderViewModel @Inject constructor(
 
         val activeSegment = chapterSegments.lastOrNull { it.startIndex <= state.currentPageIndex }
             ?: return
+        // sortedChapters may still be empty if resolveNextChapter() hasn't returned yet
+        // (e.g. user exits immediately after pages load). Fall back to a minimal Chapter
+        // built from what we already know so the DB write always happens.
         val chapter = sortedChapters.find { it.url.trimEnd('/') == activeSegment.url.trimEnd('/') }
-            ?: return
+            ?: Chapter(
+                id = activeSegment.url,
+                mangaId = mangaUrl,
+                title = "",
+                number = 0f,
+                url = activeSegment.url,
+            )
 
         val nextSegmentStart = chapterSegments.firstOrNull { it.startIndex > state.currentPageIndex }?.startIndex
             ?: state.pages.size
