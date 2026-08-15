@@ -14,6 +14,7 @@ enum class LibrarySortOrder(val displayName: String) {
     CUSTOM("Custom"),
     TITLE("Title"),
     UPDATED("Last updated"),
+    RATING("Rating"),
 }
 
 @Singleton

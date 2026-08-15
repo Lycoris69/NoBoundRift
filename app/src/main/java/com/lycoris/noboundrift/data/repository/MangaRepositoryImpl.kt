@@ -107,6 +107,10 @@ class MangaRepositoryImpl @Inject constructor(
         mangaDao.reorderAll(orderedIds)
     }
 
+    override suspend fun setRating(mangaId: String, rating: Int) {
+        mangaDao.updateRating(mangaId, rating.coerceIn(0, 5))
+    }
+
     // ── Reading progress ──────────────────────────────────────────────────────
 
     override suspend fun markChapterRead(chapter: Chapter) {
@@ -153,6 +157,7 @@ class MangaRepositoryImpl @Inject constructor(
         latestChapterAt = latestChapterAt,
         latestChapterUrl = latestChapterUrl,
         isLatestChapterRead = latestChapterUrl.isNotEmpty() && latestChapterUrl in readUrls,
+        rating = rating,
     )
 
 }

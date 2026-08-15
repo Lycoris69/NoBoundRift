@@ -42,6 +42,9 @@ interface MangaDao {
     @Query("SELECT id, latestChapterAt FROM manga_library WHERE id IN (:ids) AND latestChapterAt > 0")
     suspend fun getLatestChapterDates(ids: List<String>): List<MangaLatestDate>
 
+    @Query("UPDATE manga_library SET rating = :rating WHERE id = :id")
+    suspend fun updateRating(id: String, rating: Int)
+
     @Transaction
     suspend fun reorderAll(orderedIds: List<String>) {
         orderedIds.forEachIndexed { index, id ->

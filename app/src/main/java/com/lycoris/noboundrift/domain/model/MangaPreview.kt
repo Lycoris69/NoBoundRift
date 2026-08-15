@@ -11,4 +11,6 @@ data class MangaPreview(
     val isLatestChapterRead: Boolean = false,
     // -1 = unknown, 0 = confirmed no readable chapters
     val chapterCount: Int = -1,
+    /** User-assigned star rating 1–5. 0 = unrated. */
+    val rating: Int = 0,
 )

@@ -40,6 +40,9 @@ interface MangaRepository {
 
     suspend fun reorderLibrary(orderedIds: List<String>)
 
+    /** Sets a 1–5 star rating for a library entry. Pass 0 to clear. */
+    suspend fun setRating(mangaId: String, rating: Int)
+
     // ── Reading progress ──────────────────────────────────────────────────────
 
     suspend fun markChapterRead(chapter: Chapter)

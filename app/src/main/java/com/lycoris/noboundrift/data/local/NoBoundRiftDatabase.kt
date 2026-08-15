@@ -11,7 +11,7 @@ import com.lycoris.noboundrift.data.local.entity.MangaEntity
 
 @Database(
     entities = [MangaEntity::class, ChapterEntity::class, DownloadEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class NoBoundRiftDatabase : RoomDatabase() {

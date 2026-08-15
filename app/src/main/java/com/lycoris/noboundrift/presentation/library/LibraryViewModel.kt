@@ -98,6 +98,12 @@ class LibraryViewModel @Inject constructor(
                         }
                         LibrarySortOrder.TITLE -> list.sortedBy { it.title.lowercase() }
                         LibrarySortOrder.UPDATED -> list.sortedByDescending { it.latestChapterAt }
+                        // Unrated (0) treated as mid (3) so they land between rated items;
+                        // explicit ratings always win over the unrated default.
+                        LibrarySortOrder.RATING -> list.sortedWith(
+                            compareByDescending<MangaPreview> { if (it.rating == 0) 3 else it.rating }
+                                .thenByDescending { it.rating != 0 }
+                        )
                     }
                     _uiState.update { current ->
                         current.copy(manga = sorted, isEmpty = sorted.isEmpty())
@@ -230,5 +236,10 @@ class LibraryViewModel @Inject constructor(
 
     fun cancelAllDownloads(mangaId: String) {
         viewModelScope.launch { cancelAllDownloadsUseCase(mangaId) }
+    }
+
+    /** Sets a 1–5 star rating for a manga. Pass 0 to clear. */
+    fun setRating(mangaId: String, rating: Int) {
+        viewModelScope.launch { repository.setRating(mangaId, rating) }
     }
 }

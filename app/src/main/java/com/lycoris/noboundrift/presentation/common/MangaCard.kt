@@ -4,12 +4,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +44,7 @@ fun MangaCard(
     sourceLabel: String? = null,
     blurred: Boolean = false,
     cornerRadius: Dp = 8.dp,
+    onRatingClick: (() -> Unit)? = null,
 ) {
     Card(
         modifier = modifier
@@ -166,6 +173,45 @@ fun MangaCard(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onPrimary,
                     )
+                }
+            }
+            // Star rating badge — always shown when onRatingClick is wired (library only).
+            // Dimmed star outline when unrated (tappable to set a rating);
+            // filled amber stars when rated.
+            if (onRatingClick != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = if (showNewBadge || preview.chapterCount == 0) 26.dp else 4.dp, end = 4.dp)
+                        .background(
+                            color = Color.Black.copy(alpha = 0.55f),
+                            shape = RoundedCornerShape(4.dp),
+                        )
+                        .clickable { onRatingClick() }
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                ) {
+                    if (preview.rating > 0) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = "${preview.rating} stars",
+                                tint = Color(0xFFFFC107),
+                                modifier = Modifier.size(10.dp),
+                            )
+                            Text(
+                                text = " ${preview.rating}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                            )
+                        }
+                    } else {
+                        Icon(
+                            imageVector = Icons.Outlined.StarOutline,
+                            contentDescription = "Rate",
+                            tint = Color.White.copy(alpha = 0.5f),
+                            modifier = Modifier.size(12.dp),
+                        )
+                    }
                 }
             }
         }

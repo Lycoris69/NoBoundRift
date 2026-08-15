@@ -15,4 +15,6 @@ data class MangaEntity(
     val latestChapterAt: Long = 0L,
     val latestChapterUrl: String = "",
     val sortOrder: Long = 0L,
+    /** User-assigned star rating 1–5. 0 = unrated (default). */
+    val rating: Int = 0,
 )

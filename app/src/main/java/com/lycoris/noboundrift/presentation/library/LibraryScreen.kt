@@ -9,10 +9,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -27,14 +29,18 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.StarOutline
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -127,6 +134,7 @@ private fun LibraryGrid(
     // rememberUpdatedState so the coroutine always sees the live setting even though
     // pointerInput(Unit) never restarts when uiState.hapticFeedback changes.
     val hapticEnabledState = rememberUpdatedState(uiState.hapticFeedback)
+    var ratingTarget by remember { mutableStateOf<MangaPreview?>(null) }
 
     LazyVerticalGrid(
         state = gridState,
@@ -197,6 +205,7 @@ private fun LibraryGrid(
                     preview.latestChapterAt > System.currentTimeMillis() - NEW_CHAPTER_WINDOW_MS && !preview.isLatestChapterRead,
                 blurred = uiState.blurCovers,
                 cornerRadius = if (uiState.roundedCovers) 8.dp else 0.dp,
+                onRatingClick = { ratingTarget = preview },
                 modifier = Modifier
                     .animateItem()
                     .zIndex(if (isDragging) 1f else 0f)
@@ -209,6 +218,14 @@ private fun LibraryGrid(
                     },
             )
         }
+    }
+
+    ratingTarget?.let { target ->
+        RatingDialog(
+            currentRating = target.rating,
+            onRatingSelected = { viewModel.setRating(target.id, it) },
+            onDismiss = { ratingTarget = null },
+        )
     }
 }
 
@@ -224,6 +241,7 @@ private fun LibraryList(
     var touchYInViewport by remember { mutableStateOf(0f) }
     val haptic = LocalHapticFeedback.current
     val hapticEnabledState = rememberUpdatedState(uiState.hapticFeedback)
+    var ratingTarget by remember { mutableStateOf<MangaPreview?>(null) }
 
     LazyColumn(
         state = listState,
@@ -321,8 +339,43 @@ private fun LibraryList(
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.weight(1f),
                 )
+                // Compact star chip — always shown in list view for easy rating access.
+                // Shows filled amber stars when rated, dim outline star when unrated.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable { ratingTarget = preview }
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                ) {
+                    if (preview.rating > 0) {
+                        repeat(preview.rating) {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = null,
+                                tint = Color(0xFFFFC107),
+                                modifier = Modifier.size(14.dp),
+                            )
+                        }
+                    } else {
+                        Icon(
+                            imageVector = Icons.Outlined.StarOutline,
+                            contentDescription = "Rate",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
             }
         }
+    }
+
+    ratingTarget?.let { target ->
+        RatingDialog(
+            currentRating = target.rating,
+            onRatingSelected = { viewModel.setRating(target.id, it) },
+            onDismiss = { ratingTarget = null },
+        )
     }
 }
 
@@ -538,4 +591,58 @@ private fun EmptyLibrary() {
             modifier = Modifier.padding(32.dp),
         )
     }
+}
+
+/**
+ * Five-star rating picker dialog.
+ *
+ * [currentRating] is 0–5 (0 = unrated). Tapping the same star that is already
+ * selected clears the rating (sets it to 0). The "Clear" button is shown
+ * whenever the manga has an existing rating.
+ */
+@Composable
+fun RatingDialog(
+    currentRating: Int,
+    onRatingSelected: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rate this manga") },
+        text = {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                for (star in 1..5) {
+                    val filled = star <= currentRating
+                    Icon(
+                        imageVector = if (filled) Icons.Filled.Star else Icons.Outlined.StarOutline,
+                        contentDescription = "$star star${if (star > 1) "s" else ""}",
+                        tint = if (filled) Color(0xFFFFC107) else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clickable {
+                                // Tap the same filled star → clear; otherwise set new rating
+                                onRatingSelected(if (star == currentRating) 0 else star)
+                                onDismiss()
+                            },
+                    )
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            Row {
+                if (currentRating > 0) {
+                    TextButton(onClick = { onRatingSelected(0); onDismiss() }) {
+                        Text("Clear")
+                    }
+                    Spacer(Modifier.width(8.dp))
+                }
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
+        },
+    )
 }
