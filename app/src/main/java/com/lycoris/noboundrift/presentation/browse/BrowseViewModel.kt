@@ -27,6 +27,8 @@ data class BrowseUiState(
     val manga: List<MangaPreview> = emptyList(),
     val isLoading: Boolean = false,
     val isLoadingMore: Boolean = false,
+    /** True while a pull-to-refresh gesture is in progress (keeps the grid visible). */
+    val isRefreshing: Boolean = false,
     val error: String? = null,
     val currentPage: Int = 1,
     val canLoadMore: Boolean = true,
@@ -47,6 +49,8 @@ data class BrowseUiState(
     val showDateGroups: Boolean = true,
     val browseGridColumns: Int = 3,
     val blurCovers: Boolean = false,
+    /** ID of the currently selected source, mirrored here for the source-picker UI. */
+    val currentSourceId: Long = 0L,
 )
 
 @HiltViewModel
@@ -98,7 +102,7 @@ class BrowseViewModel @Inject constructor(
                     initialized = true
                     sourceId = newSourceId
                     val showDates = runCatching { sourceManager.getSource(newSourceId).providesLatestDates }.getOrDefault(true)
-                    _uiState.update { it.copy(showDateGroups = showDates) }
+                    _uiState.update { it.copy(showDateGroups = showDates, currentSourceId = newSourceId) }
                     if (altTitles.isNotEmpty()) {
                         val allTitles = (listOf(initialQuery) + altTitles).filter { it.isNotBlank() }.distinct()
                         launchMultiTitleSearch(allTitles)
@@ -111,7 +115,7 @@ class BrowseViewModel @Inject constructor(
                     loadJob?.cancel()
                     crossSourceJob?.cancel()
                     val showDates = runCatching { sourceManager.getSource(newSourceId).providesLatestDates }.getOrDefault(true)
-                    _uiState.update { BrowseUiState(searchQuery = it.searchQuery, showDateGroups = showDates) }
+                    _uiState.update { BrowseUiState(searchQuery = it.searchQuery, showDateGroups = showDates, currentSourceId = newSourceId) }
                     loadPage(page = 1)
                 }
             }
@@ -141,8 +145,14 @@ class BrowseViewModel @Inject constructor(
         loadJob?.cancel()
         crossSourceJob?.cancel()
         enrichJob?.cancel()
-        _uiState.update { it.copy(manga = emptyList(), currentPage = 1, canLoadMore = true, error = null, isLoading = false, isLoadingMore = false) }
+        _uiState.update { it.copy(manga = emptyList(), currentPage = 1, canLoadMore = true, error = null, isLoading = false, isLoadingMore = false, isRefreshing = true) }
         loadPage(page = 1)
+    }
+
+    /** Switches the active source without navigating away from Browse. */
+    fun selectSource(id: Long) {
+        sourcePreferences.setSelectedSourceId(id)
+        // The sourcePreferences Flow observer in init handles the actual reload.
     }
 
     /**
@@ -242,6 +252,7 @@ class BrowseViewModel @Inject constructor(
                             manga = combined.distinctBy { it.id },
                             isLoading = false,
                             isLoadingMore = false,
+                            isRefreshing = false,
                             currentPage = page,
                             canLoadMore = newItems.isNotEmpty() && querySnapshot.isBlank(),
                         )
@@ -272,6 +283,7 @@ class BrowseViewModel @Inject constructor(
                         it.copy(
                             isLoading = false,
                             isLoadingMore = false,
+                            isRefreshing = false,
                             error = message,
                             needsCfBypass = cfInfo != null,
                             cfTargetUrl = cfInfo?.first ?: it.cfTargetUrl,

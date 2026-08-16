@@ -17,20 +17,25 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.WifiOff
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -50,6 +56,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import java.util.Calendar
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BrowseScreen(
     onMangaClick: (MangaPreview) -> Unit,
@@ -86,33 +93,44 @@ fun BrowseScreen(
             SearchBar(
                 query = uiState.searchQuery,
                 onQueryChange = viewModel::onSearchQueryChange,
-                onRefresh = viewModel::refresh,
+                currentSourceId = uiState.currentSourceId,
+                allSourceNames = allSourceNames,
+                onSourceSelected = viewModel::selectSource,
             )
         }
 
-        when {
-            uiState.isLoading -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+        // Pull-to-refresh wraps all content below the search bar.
+        // isLoading is only checked for the full-page spinner when NOT refreshing —
+        // during a pull-to-refresh the grid stays visible and the PTR indicator shows.
+        PullToRefreshBox(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = viewModel::refresh,
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            when {
+                uiState.isLoading && !uiState.isRefreshing -> {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
                 }
-            }
 
-            uiState.error != null && uiState.manga.isEmpty() -> {
-                ErrorState(
-                    message = uiState.error!!,
-                    needsCfBypass = uiState.needsCfBypass,
-                    onRetry = viewModel::retry,
-                    onOpenCfDialog = { showCfDialog = true },
-                )
-            }
+                uiState.error != null && uiState.manga.isEmpty() -> {
+                    ErrorState(
+                        message = uiState.error!!,
+                        needsCfBypass = uiState.needsCfBypass,
+                        onRetry = viewModel::retry,
+                        onOpenCfDialog = { showCfDialog = true },
+                    )
+                }
 
-            else -> {
-                BrowseGrid(
-                    uiState = uiState,
-                    onMangaClick = onMangaClick,
-                    onLoadMore = viewModel::loadNextPage,
-                    allSourceNames = allSourceNames,
-                )
+                else -> {
+                    BrowseGrid(
+                        uiState = uiState,
+                        onMangaClick = onMangaClick,
+                        onLoadMore = viewModel::loadNextPage,
+                        allSourceNames = allSourceNames,
+                    )
+                }
             }
         }
     }
@@ -149,7 +167,9 @@ private fun DiscoverModeHeader(title: String, onExit: () -> Unit) {
 private fun SearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
-    onRefresh: () -> Unit,
+    currentSourceId: Long,
+    allSourceNames: Map<Long, String>,
+    onSourceSelected: (Long) -> Unit,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -172,8 +192,52 @@ private fun SearchBar(
             singleLine = true,
             modifier = Modifier.weight(1f),
         )
-        IconButton(onClick = onRefresh) {
-            Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+
+        Spacer(modifier = Modifier.width(4.dp))
+
+        // Source picker — compact chip that opens a dropdown listing all sources.
+        Box {
+            var expanded by remember { mutableStateOf(false) }
+            val currentName = allSourceNames[currentSourceId] ?: "Source"
+            TextButton(onClick = { expanded = true }) {
+                Text(
+                    text = currentName,
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Icon(
+                    imageVector = Icons.Default.ArrowDropDown,
+                    contentDescription = "Change source",
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+            ) {
+                allSourceNames.entries
+                    .sortedBy { it.value }
+                    .forEach { (id, name) ->
+                        DropdownMenuItem(
+                            text = { Text(name) },
+                            onClick = {
+                                onSourceSelected(id)
+                                expanded = false
+                            },
+                            leadingIcon = if (id == currentSourceId) {
+                                {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                }
+                            } else null,
+                        )
+                    }
+            }
         }
     }
 }
