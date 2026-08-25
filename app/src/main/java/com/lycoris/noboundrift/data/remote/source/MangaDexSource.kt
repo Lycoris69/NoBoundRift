@@ -22,6 +22,8 @@ class MangaDexSource @Inject constructor(
     override val id: Long = 5L
     override val name: String = "MangaDex"
     override val baseUrl: String = "https://mangadex.org"
+    // MangaDex browse order is curated by the API — date grouping would scramble it.
+    override val providesLatestDates: Boolean = false
 
     private val apiBase = "https://api.mangadex.org"
 
