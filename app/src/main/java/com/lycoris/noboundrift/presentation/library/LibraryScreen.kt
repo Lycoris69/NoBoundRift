@@ -108,6 +108,7 @@ fun LibraryScreen(
             LibraryTab.DOWNLOADS -> {
                 DownloadsTab(
                     groups = uiState.downloadGroups,
+                    readChapterUrls = uiState.readChapterUrls,
                     onMangaClick = onMangaClick,
                     onChapterClick = onChapterClick,
                     onCancelDownload = viewModel::cancelDownload,
@@ -382,6 +383,7 @@ private fun LibraryList(
 @Composable
 private fun DownloadsTab(
     groups: List<MangaDownloadGroup>,
+    readChapterUrls: Set<String>,
     onMangaClick: (MangaPreview) -> Unit,
     onChapterClick: (sourceId: Long, mangaId: String, chapterUrl: String, mangaTitle: String) -> Unit,
     onCancelDownload: (String) -> Unit,
@@ -408,6 +410,7 @@ private fun DownloadsTab(
             items(groups, key = { it.mangaId }) { group ->
                 MangaDownloadGroupCard(
                     group = group,
+                    readChapterUrls = readChapterUrls,
                     onCancelDownload = onCancelDownload,
                     onRetryDownload = onRetryDownload,
                     onDeleteDownload = onDeleteDownload,
@@ -435,6 +438,7 @@ private fun DownloadsTab(
 @Composable
 private fun MangaDownloadGroupCard(
     group: MangaDownloadGroup,
+    readChapterUrls: Set<String>,
     onCancelDownload: (String) -> Unit,
     onRetryDownload: (DownloadEntity) -> Unit,
     onDeleteDownload: (String) -> Unit,
@@ -495,6 +499,7 @@ private fun MangaDownloadGroupCard(
             group.chapters.forEach { entity ->
                 LibraryDownloadChapterRow(
                     entity = entity,
+                    isRead = entity.chapterUrl.trimEnd('/') in readChapterUrls,
                     onCancel = { onCancelDownload(entity.chapterUrl) },
                     onRetry = { onRetryDownload(entity) },
                     onDelete = { onDeleteDownload(entity.chapterUrl) },
@@ -508,6 +513,7 @@ private fun MangaDownloadGroupCard(
 @Composable
 private fun LibraryDownloadChapterRow(
     entity: DownloadEntity,
+    isRead: Boolean,
     onCancel: () -> Unit,
     onRetry: () -> Unit,
     onDelete: () -> Unit,
@@ -527,7 +533,30 @@ private fun LibraryDownloadChapterRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(entity.chapterTitle, style = MaterialTheme.typography.bodySmall)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = entity.chapterTitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isRead) MaterialTheme.colorScheme.onSurfaceVariant
+                            else MaterialTheme.colorScheme.onSurface,
+                )
+                if (isRead) {
+                    Text(
+                        text = "READ",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier
+                            .background(
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                shape = RoundedCornerShape(3.dp),
+                            )
+                            .padding(horizontal = 4.dp, vertical = 1.dp),
+                    )
+                }
+            }
             val sub = when (entity.status) {
                 DownloadStatus.QUEUED -> "Queued"
                 DownloadStatus.DOWNLOADING -> "${entity.downloadedPages} / ${entity.totalPages} pages"

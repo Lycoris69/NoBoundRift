@@ -146,6 +146,9 @@ class MangaRepositoryImpl @Inject constructor(
         chapterDao.observeByManga(mangaId)
             .map { entities -> entities.filter { it.read }.map { it.chapterUrl }.toSet() }
 
+    override fun observeAllReadChapterUrls(): Flow<Set<String>> =
+        chapterDao.observeAllReadUrls().map { it.toHashSet() }
+
     // ── Mappers ───────────────────────────────────────────────────────────────
 
     private fun MangaEntity.toPreview(readUrls: Set<String> = emptySet()) = MangaPreview(

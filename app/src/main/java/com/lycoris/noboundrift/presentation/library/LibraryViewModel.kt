@@ -53,6 +53,8 @@ data class LibraryUiState(
     val roundedCovers: Boolean = true,
     val blurCovers: Boolean = false,
     val hapticFeedback: Boolean = true,
+    /** All chapter URLs (normalized) the user has marked read — used for "READ" badge in Downloads. */
+    val readChapterUrls: Set<String> = emptySet(),
 )
 
 @HiltViewModel
@@ -167,6 +169,12 @@ class LibraryViewModel @Inject constructor(
                     }
                     .sortedBy { it.mangaTitle }
                 _uiState.update { it.copy(downloadGroups = groups) }
+            }
+        }
+
+        viewModelScope.launch {
+            repository.observeAllReadChapterUrls().collect { urls ->
+                _uiState.update { it.copy(readChapterUrls = urls) }
             }
         }
 

@@ -55,4 +55,7 @@ interface MangaRepository {
     fun getLastReadChapter(mangaId: String): Flow<String?>
 
     fun observeReadChapterUrls(mangaId: String): Flow<Set<String>>
+
+    /** Emits the set of all chapter URLs (normalized) that have been marked read. */
+    fun observeAllReadChapterUrls(): Flow<Set<String>>
 }
