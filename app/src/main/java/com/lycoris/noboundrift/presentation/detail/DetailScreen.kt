@@ -31,8 +31,11 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -45,6 +48,7 @@ import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -69,6 +73,7 @@ import com.lycoris.noboundrift.presentation.theme.ReadIndicator
 fun DetailScreen(
     onChapterClick: (sourceId: Long, mangaId: String, chapterUrl: String, mangaTitle: String) -> Unit,
     onBackClick: () -> Unit,
+    onMigrateToSource: ((title: String) -> Unit)? = null,
     viewModel: DetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -143,6 +148,7 @@ fun DetailScreen(
                         onDownloadAll = viewModel::downloadAllChapters,
                         onCancelAll = viewModel::cancelAllDownloads,
                         onDeleteDownload = viewModel::deleteDownload,
+                        onMigrateToSource = if (state.manga.sourceId == 3L) onMigrateToSource else null,
                     )
                 }
             }
@@ -170,6 +176,7 @@ private fun MangaDetail(
     onDownloadAll: () -> Unit,
     onCancelAll: () -> Unit,
     onDeleteDownload: (String) -> Unit,
+    onMigrateToSource: ((String) -> Unit)? = null,
 ) {
     val continueChapter = remember(manga.chapters, lastReadChapterUrl) {
         lastReadChapterUrl?.let { url -> manga.chapters.find { it.url.trimEnd('/') == url } }
@@ -229,6 +236,46 @@ private fun MangaDetail(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                         )
+                    }
+                }
+            }
+        }
+
+        // Offline-source migration banner — shown when the source is known to be unreachable.
+        if (onMigrateToSource != null) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.WifiOff,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Source offline",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                            )
+                            Text(
+                                text = "Manhwaz is unreachable. Find this title elsewhere.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                            )
+                        }
+                        TextButton(onClick = { onMigrateToSource(manga.title) }) {
+                            Text("MangaDex")
+                        }
                     }
                 }
             }

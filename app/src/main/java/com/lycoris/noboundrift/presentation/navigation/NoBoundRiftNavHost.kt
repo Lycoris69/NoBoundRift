@@ -187,6 +187,14 @@ fun NoBoundRiftNavHost(
                         )
                     },
                     onBackClick = { navController.popBackStack() },
+                    onMigrateToSource = { title ->
+                        // Manhwaz is offline — switch to MangaDex and pre-fill the search query.
+                        viewModel.switchToSource(5L)
+                        navController.navigate(Screen.Browse.createRoute(title)) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = false }
+                            launchSingleTop = false
+                        }
+                    },
                 )
             }
 

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lycoris.noboundrift.data.local.AppearancePreferences
 import com.lycoris.noboundrift.data.local.NavigationPreferences
+import com.lycoris.noboundrift.data.local.SourcePreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -14,6 +15,7 @@ import javax.inject.Inject
 class NavHostViewModel @Inject constructor(
     navigationPreferences: NavigationPreferences,
     appearancePreferences: AppearancePreferences,
+    private val sourcePreferences: SourcePreferences,
 ) : ViewModel() {
 
     val showDiscoverTab: StateFlow<Boolean> = navigationPreferences
@@ -23,4 +25,9 @@ class NavHostViewModel @Inject constructor(
     val hideBottomBarLabels: StateFlow<Boolean> = appearancePreferences
         .observeHideBottomBarLabels()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppearancePreferences.DEFAULT_HIDE_LABELS)
+
+    /** Switch the active Browse source without navigating — caller handles nav. */
+    fun switchToSource(sourceId: Long) {
+        sourcePreferences.setSelectedSourceId(sourceId)
+    }
 }
