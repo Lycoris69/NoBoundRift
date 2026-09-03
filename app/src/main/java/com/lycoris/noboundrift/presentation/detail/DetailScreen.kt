@@ -123,7 +123,16 @@ fun DetailScreen(
                             modifier = Modifier.padding(32.dp),
                         ) {
                             Text(text = state.message, color = MaterialTheme.colorScheme.error)
-                            Button(onClick = viewModel::retry) { Text("Retry") }
+                            if (onMigrateToSource != null) {
+                                // Source is offline and no library entry was found — still offer
+                                // the MangaDex search (manga title is unknown so search will be
+                                // pre-filled with whatever the URL slug contains).
+                                Button(onClick = { onMigrateToSource("") }) {
+                                    Text("Search on MangaDex")
+                                }
+                            } else {
+                                Button(onClick = viewModel::retry) { Text("Retry") }
+                            }
                         }
                     }
                 }

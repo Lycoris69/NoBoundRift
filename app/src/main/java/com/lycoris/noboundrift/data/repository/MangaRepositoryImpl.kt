@@ -74,6 +74,9 @@ class MangaRepositoryImpl @Inject constructor(
             entities.map { it.toPreview(readUrlList.toHashSet()) }
         }
 
+    override suspend fun getLibraryEntry(mangaId: String): MangaPreview? =
+        mangaDao.getById(mangaId)?.toPreview()
+
     override suspend fun addToLibrary(manga: MangaPreview) {
         val now = System.currentTimeMillis()
         mangaDao.insert(

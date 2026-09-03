@@ -24,6 +24,9 @@ interface MangaRepository {
 
     fun getLibrary(): Flow<List<MangaPreview>>
 
+    /** Returns the single library entry for [mangaId], or null if not saved. */
+    suspend fun getLibraryEntry(mangaId: String): MangaPreview?
+
     suspend fun addToLibrary(manga: MangaPreview)
 
     suspend fun removeFromLibrary(mangaId: String)
