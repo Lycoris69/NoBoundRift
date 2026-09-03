@@ -29,6 +29,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
+import androidx.compose.ui.platform.LocalContext
 import com.lycoris.noboundrift.domain.model.MangaPreview
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -45,6 +48,9 @@ fun MangaCard(
     blurred: Boolean = false,
     cornerRadius: Dp = 8.dp,
     onRatingClick: (() -> Unit)? = null,
+    /** Set to false for covers from offline/dead sources — skips the network and serves
+     *  only from Coil's disk/memory cache, avoiding a 10-second timeout per image. */
+    allowNetwork: Boolean = true,
 ) {
     Card(
         modifier = modifier
@@ -54,8 +60,20 @@ fun MangaCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Box {
+            val context = LocalContext.current
+            val imageModel = if (allowNetwork) {
+                preview.coverUrl
+            } else {
+                // Source is offline — never touch the network. Serve from Coil's disk/memory
+                // cache only; if the image was never cached, show nothing immediately instead
+                // of hanging for the full OkHttp connect+read timeout.
+                ImageRequest.Builder(context)
+                    .data(preview.coverUrl)
+                    .networkCachePolicy(CachePolicy.DISABLED)
+                    .build()
+            }
             AsyncImage(
-                model = preview.coverUrl,
+                model = imageModel,
                 contentDescription = preview.title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier

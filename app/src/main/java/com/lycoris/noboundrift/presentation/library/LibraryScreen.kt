@@ -63,6 +63,9 @@ import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
+import androidx.compose.ui.platform.LocalContext
 import com.lycoris.noboundrift.data.local.LibraryLayout
 import com.lycoris.noboundrift.data.local.entity.DownloadEntity
 import com.lycoris.noboundrift.data.local.entity.DownloadStatus
@@ -207,6 +210,7 @@ private fun LibraryGrid(
                 blurred = uiState.blurCovers,
                 cornerRadius = if (uiState.roundedCovers) 8.dp else 0.dp,
                 onRatingClick = { ratingTarget = preview },
+                allowNetwork = preview.sourceId != 3L,
                 modifier = Modifier
                     .animateItem()
                     .zIndex(if (isDragging) 1f else 0f)
@@ -312,8 +316,13 @@ private fun LibraryList(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Box {
+                    val listContext = LocalContext.current
                     AsyncImage(
-                        model = preview.coverUrl,
+                        model = if (preview.sourceId != 3L) preview.coverUrl else
+                            ImageRequest.Builder(listContext)
+                                .data(preview.coverUrl)
+                                .networkCachePolicy(CachePolicy.DISABLED)
+                                .build(),
                         contentDescription = preview.title,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
@@ -460,8 +469,13 @@ private fun MangaDownloadGroupCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            val dlContext = LocalContext.current
             AsyncImage(
-                model = group.mangaCoverUrl,
+                model = if (group.sourceId != 3L) group.mangaCoverUrl else
+                    ImageRequest.Builder(dlContext)
+                        .data(group.mangaCoverUrl)
+                        .networkCachePolicy(CachePolicy.DISABLED)
+                        .build(),
                 contentDescription = group.mangaTitle,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
