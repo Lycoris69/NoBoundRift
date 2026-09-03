@@ -146,22 +146,21 @@ class DetailViewModel @Inject constructor(
         viewModelScope.launch { cancelAllDownloadsUseCase(mangaId) }
     }
 
-    /** Source IDs whose sites are confirmed permanently offline — skip the network entirely. */
-    private val offlineSourceIds = setOf(3L) // Manhwaz
+    /** Source IDs whose domains are permanently unreachable — skip the network entirely. */
+    val isSourceOffline: Boolean = sourceId == 3L // Manhwaz
 
     private fun loadDetail() {
         loadJob?.cancel()
         observersJob?.cancel()
         loadJob = viewModelScope.launch {
             _uiState.value = DetailUiState.Loading
-            // For dead sources skip the DNS lookup/timeout and jump straight to the
-            // offline synthesiser — avoids a 10–30 s hang per page open.
-            val detailResult = if (sourceId in offlineSourceIds) {
-                Result.failure(Exception("Source offline"))
-            } else {
-                getMangaDetail(sourceId = sourceId, url = mangaUrl)
+            // Dead source: skip the DNS lookup entirely to avoid a 10–30 s timeout.
+            // Show Error immediately so the UI can offer a "Search on MangaDex" CTA.
+            if (isSourceOffline) {
+                _uiState.value = DetailUiState.Error("Manhwaz is no longer reachable.")
+                return@launch
             }
-            detailResult
+            getMangaDetail(sourceId = sourceId, url = mangaUrl)
                 .onSuccess { manga ->
                     // Show metadata immediately while chapters are still loading
                     _uiState.value = DetailUiState.Success(
@@ -222,32 +221,9 @@ class DetailViewModel @Inject constructor(
                         )
                         startObservers(first.mangaId)
                     } else {
-                        // Last resort: synthesise from the library entry stored in Room
-                        // (title and cover are persisted there even with no downloads).
-                        val mangaId = mangaUrl.trimEnd('/').substringAfterLast('/')
-                        val libraryEntry = repository.getLibraryEntry(mangaId)
-                        if (libraryEntry != null) {
-                            val offlineManga = Manga(
-                                id = libraryEntry.id,
-                                title = libraryEntry.title,
-                                coverUrl = libraryEntry.coverUrl,
-                                synopsis = "",
-                                genres = emptyList(),
-                                status = MangaStatus.UNKNOWN,
-                                sourceId = libraryEntry.sourceId,
-                                url = libraryEntry.url,
-                                chapters = emptyList(),
-                            )
-                            _uiState.value = DetailUiState.Success(
-                                manga = offlineManga,
-                                isLoadingChapters = false,
-                            )
-                            startObservers(libraryEntry.id)
-                        } else {
-                            _uiState.value = DetailUiState.Error(
-                                throwable.message ?: "Failed to load manga details"
-                            )
-                        }
+                        _uiState.value = DetailUiState.Error(
+                            throwable.message ?: "Failed to load manga details"
+                        )
                     }
                 }
         }

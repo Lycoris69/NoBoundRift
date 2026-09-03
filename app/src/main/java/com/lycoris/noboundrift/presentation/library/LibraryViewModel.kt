@@ -247,6 +247,11 @@ class LibraryViewModel @Inject constructor(
     }
 
     /** Sets a 1–5 star rating for a manga. Pass 0 to clear. */
+    /** Removes every library entry for a permanently-offline source (e.g. Manhwaz = 3L). */
+    fun purgeSource(sourceId: Long) {
+        viewModelScope.launch { repository.removeBySourceId(sourceId) }
+    }
+
     fun setRating(mangaId: String, rating: Int) {
         viewModelScope.launch { repository.setRating(mangaId, rating) }
     }

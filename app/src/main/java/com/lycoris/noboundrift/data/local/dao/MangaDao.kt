@@ -29,6 +29,9 @@ interface MangaDao {
     @Query("DELETE FROM manga_library WHERE id = :mangaId")
     suspend fun deleteById(mangaId: String)
 
+    @Query("DELETE FROM manga_library WHERE sourceId = :sourceId")
+    suspend fun deleteBySourceId(sourceId: Long)
+
     @Query("UPDATE manga_library SET latestChapterAt = :latestAt, latestChapterUrl = :latestChapterUrl WHERE id = :mangaId")
     suspend fun updateLatestChapterAt(mangaId: String, latestAt: Long, latestChapterUrl: String)
 

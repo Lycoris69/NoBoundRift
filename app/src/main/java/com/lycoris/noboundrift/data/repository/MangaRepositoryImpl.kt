@@ -96,6 +96,10 @@ class MangaRepositoryImpl @Inject constructor(
         mangaDao.deleteById(mangaId)
     }
 
+    override suspend fun removeBySourceId(sourceId: Long) {
+        mangaDao.deleteBySourceId(sourceId)
+    }
+
     override fun isInLibrary(mangaId: String): Flow<Boolean> =
         mangaDao.observeExists(mangaId)
 

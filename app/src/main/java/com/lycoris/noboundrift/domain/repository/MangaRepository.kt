@@ -31,6 +31,9 @@ interface MangaRepository {
 
     suspend fun removeFromLibrary(mangaId: String)
 
+    /** Bulk-removes every library entry whose source matches [sourceId]. */
+    suspend fun removeBySourceId(sourceId: Long)
+
     fun isInLibrary(mangaId: String): Flow<Boolean>
 
     suspend fun updateLatestChapterAt(mangaId: String, latestAt: Long, latestChapterUrl: String)

@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Star
@@ -82,6 +83,31 @@ fun LibraryScreen(
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var showPurgeDialog by remember { mutableStateOf(false) }
+
+    // Confirm dialog — shown before bulk-removing offline source entries.
+    val offlineCount = remember(uiState.manga) { uiState.manga.count { it.sourceId == 3L } }
+    if (showPurgeDialog) {
+        AlertDialog(
+            onDismissRequest = { showPurgeDialog = false },
+            title = { Text("Remove Manhwaz manga?") },
+            text = {
+                Text(
+                    "$offlineCount manga from Manhwaz (now offline) will be removed from your " +
+                        "library. Your read progress is kept. This cannot be undone."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.purgeSource(3L)
+                    showPurgeDialog = false
+                }) { Text("Remove all", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPurgeDialog = false }) { Text("Cancel") }
+            },
+        )
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         TabRow(selectedTabIndex = uiState.selectedTab.ordinal) {
@@ -91,6 +117,34 @@ fun LibraryScreen(
                     onClick = { viewModel.setTab(tab) },
                     text = { Text(if (tab == LibraryTab.LIBRARY) "Library" else "Downloads") },
                 )
+            }
+        }
+
+        // Offline-source warning banner — visible whenever Manhwaz entries remain in the library.
+        if (offlineCount > 0 && uiState.selectedTab == LibraryTab.LIBRARY) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.errorContainer)
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.WifiOff,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.size(16.dp),
+                )
+                Text(
+                    text = "$offlineCount Manhwaz manga (source offline)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = { showPurgeDialog = true }) {
+                    Text("Remove all", color = MaterialTheme.colorScheme.error)
+                }
             }
         }
 
