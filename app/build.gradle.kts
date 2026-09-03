@@ -14,8 +14,8 @@ android {
         applicationId = "com.lycoris.noboundrift"
         minSdk = 26
         targetSdk = 35
-        versionCode = 93
-        versionName = "2.6.6"
+        versionCode = 94
+        versionName = "2.6.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
