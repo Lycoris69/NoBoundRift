@@ -17,4 +17,6 @@ data class MangaEntity(
     val sortOrder: Long = 0L,
     /** User-assigned star rating 1–5. 0 = unrated (default). */
     val rating: Int = 0,
+    /** JSON map of sourceId (string) → url for every source this manga has been linked to. */
+    val sourceUrls: String = "",
 )

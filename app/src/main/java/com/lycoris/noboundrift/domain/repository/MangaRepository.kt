@@ -34,6 +34,13 @@ interface MangaRepository {
     /** Bulk-removes every library entry whose source matches [sourceId]. */
     suspend fun removeBySourceId(sourceId: Long)
 
+    /**
+     * Switches an existing library entry to a new source. Deletes the old row and
+     * inserts a new one with the new source's identity, preserving user metadata
+     * (rating, sortOrder, addedAt, sourceUrls history).
+     */
+    suspend fun switchMangaSource(oldMangaId: String, newPreview: MangaPreview)
+
     fun isInLibrary(mangaId: String): Flow<Boolean>
 
     suspend fun updateLatestChapterAt(mangaId: String, latestAt: Long, latestChapterUrl: String)

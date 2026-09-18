@@ -10,6 +10,7 @@ import com.lycoris.noboundrift.domain.model.MangaPreview
 import com.lycoris.noboundrift.domain.model.Page
 import com.lycoris.noboundrift.domain.repository.DownloadRepository
 import com.lycoris.noboundrift.domain.repository.MangaRepository
+import org.json.JSONObject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -79,6 +80,9 @@ class MangaRepositoryImpl @Inject constructor(
 
     override suspend fun addToLibrary(manga: MangaPreview) {
         val now = System.currentTimeMillis()
+        val sourceUrls = JSONObject()
+            .put(manga.sourceId.toString(), manga.url)
+            .toString()
         mangaDao.insert(
             MangaEntity(
                 id = manga.id,
@@ -88,6 +92,34 @@ class MangaRepositoryImpl @Inject constructor(
                 url = manga.url,
                 addedAt = now,
                 sortOrder = now,
+                sourceUrls = sourceUrls,
+            )
+        )
+    }
+
+    override suspend fun switchMangaSource(oldMangaId: String, newPreview: MangaPreview) {
+        val existing = mangaDao.getById(oldMangaId) ?: return
+        val urlMap = try {
+            JSONObject(existing.sourceUrls.ifEmpty { "{}" })
+        } catch (_: Exception) {
+            JSONObject()
+        }
+        urlMap.put(existing.sourceId.toString(), existing.url)
+        urlMap.put(newPreview.sourceId.toString(), newPreview.url)
+        mangaDao.deleteById(oldMangaId)
+        mangaDao.insert(
+            MangaEntity(
+                id = newPreview.id,
+                title = newPreview.title,
+                coverUrl = newPreview.coverUrl,
+                sourceId = newPreview.sourceId,
+                url = newPreview.url,
+                addedAt = existing.addedAt,
+                sortOrder = existing.sortOrder,
+                rating = existing.rating,
+                latestChapterAt = existing.latestChapterAt,
+                latestChapterUrl = existing.latestChapterUrl,
+                sourceUrls = urlMap.toString(),
             )
         )
     }

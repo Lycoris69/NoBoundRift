@@ -31,18 +31,25 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Tab
@@ -50,9 +57,12 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -66,6 +76,7 @@ import com.lycoris.noboundrift.data.local.entity.DownloadEntity
 import com.lycoris.noboundrift.data.local.entity.DownloadStatus
 import com.lycoris.noboundrift.domain.model.Chapter
 import com.lycoris.noboundrift.domain.model.Manga
+import com.lycoris.noboundrift.domain.model.MangaPreview
 import com.lycoris.noboundrift.presentation.theme.ReadIndicator
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -77,6 +88,7 @@ fun DetailScreen(
     viewModel: DetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val sourceSwitcher by viewModel.sourceSwitcher.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -103,6 +115,30 @@ fun DetailScreen(
                                 else MaterialTheme.colorScheme.onSurface,
                             )
                         }
+                        // Overflow menu — only when in library (source switching requires a library entry)
+                        if (state.isInLibrary) {
+                            var showMenu by remember { mutableStateOf(false) }
+                            Box {
+                                IconButton(onClick = { showMenu = true }) {
+                                    Icon(Icons.Default.MoreVert, contentDescription = "More options")
+                                }
+                                DropdownMenu(
+                                    expanded = showMenu,
+                                    onDismissRequest = { showMenu = false },
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Change Source") },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.SwapHoriz, contentDescription = null)
+                                        },
+                                        onClick = {
+                                            showMenu = false
+                                            viewModel.openSourceSwitcher()
+                                        },
+                                    )
+                                }
+                            }
+                        }
                     }
                 },
             )
@@ -124,7 +160,6 @@ fun DetailScreen(
                         ) {
                             Text(text = state.message, color = MaterialTheme.colorScheme.error)
                             if (viewModel.isSourceOffline && onMigrateToSource != null) {
-                                // Manhwaz is permanently down — offer MangaDex search instead of Retry.
                                 Button(onClick = { onMigrateToSource("") }) {
                                     Text("Search on MangaDex")
                                 }
@@ -157,6 +192,118 @@ fun DetailScreen(
                         onDeleteDownload = viewModel::deleteDownload,
                         onMigrateToSource = if (state.manga.sourceId == 3L) onMigrateToSource else null,
                     )
+                }
+            }
+        }
+    }
+
+    // Source switcher sheet — rendered outside Scaffold so it overlays everything
+    if (sourceSwitcher != null) {
+        SourceSwitcherSheet(
+            state = sourceSwitcher!!,
+            sources = viewModel.switchSources,
+            onSelectSource = viewModel::selectSwitchTarget,
+            onQueryChange = viewModel::updateSwitchQuery,
+            onConfirmSwitch = viewModel::confirmSourceSwitch,
+            onBackToPickSource = viewModel::goBackToPickSource,
+            onDismiss = viewModel::closeSourceSwitcher,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SourceSwitcherSheet(
+    state: SourceSwitcherState,
+    sources: List<Pair<Long, String>>,
+    onSelectSource: (Long, String) -> Unit,
+    onQueryChange: (String) -> Unit,
+    onConfirmSwitch: (MangaPreview) -> Unit,
+    onBackToPickSource: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        when (state.step) {
+            SourceSwitcherStep.PICK_SOURCE -> {
+                Text(
+                    text = "Change Source",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                )
+                HorizontalDivider()
+                sources.forEach { (id, name) ->
+                    ListItem(
+                        headlineContent = { Text(name) },
+                        modifier = Modifier.clickable { onSelectSource(id, name) },
+                    )
+                }
+                Spacer(Modifier.height(24.dp))
+            }
+
+            SourceSwitcherStep.SEARCH -> {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 4.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onBackToPickSource) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back to source list")
+                    }
+                    Text(
+                        text = "Search on ${state.targetSourceName}",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+                OutlinedTextField(
+                    value = state.query,
+                    onValueChange = onQueryChange,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    label = { Text("Title") },
+                    singleLine = true,
+                )
+                if (state.isSearching) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+                if (state.searchError != null) {
+                    Text(
+                        text = state.searchError,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+                LazyColumn(
+                    contentPadding = PaddingValues(bottom = 32.dp),
+                ) {
+                    items(state.results, key = { it.id }) { preview ->
+                        ListItem(
+                            headlineContent = { Text(preview.title) },
+                            leadingContent = {
+                                AsyncImage(
+                                    model = preview.coverUrl,
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .size(width = 48.dp, height = 72.dp)
+                                        .clip(RoundedCornerShape(4.dp)),
+                                    contentScale = ContentScale.Crop,
+                                )
+                            },
+                            modifier = Modifier.clickable { onConfirmSwitch(preview) },
+                        )
+                    }
                 }
             }
         }
@@ -248,7 +395,7 @@ private fun MangaDetail(
             }
         }
 
-        // Offline-source migration banner — shown when the source is known to be unreachable.
+        // Offline-source migration banner
         if (onMigrateToSource != null) {
             item {
                 Card(
@@ -353,7 +500,7 @@ private fun MangaDetail(
                 }
             }
 
-            // Language selector — only shown for multi-language sources (e.g. MangaDex)
+            // Language selector
             if (availableLanguages.size > 1) {
                 item {
                     LazyRow(
@@ -377,7 +524,7 @@ private fun MangaDetail(
                 }
             }
 
-            // Continue Reading button — only present after at least one chapter has been read
+            // Continue Reading button
             if (continueChapter != null) {
                 item {
                     val n = continueChapter.number
@@ -507,7 +654,6 @@ private fun DownloadChapterRow(
                 text = chapter.title.ifBlank { val n = chapter.number; "Chapter ${if (n % 1f == 0f) n.toInt() else n}" },
                 style = MaterialTheme.typography.bodyMedium,
             )
-            // Status subtitle
             val statusText = when (entity?.status) {
                 DownloadStatus.QUEUED -> "Queued"
                 DownloadStatus.DOWNLOADING -> "${entity.downloadedPages} / ${entity.totalPages} pages"
@@ -525,7 +671,6 @@ private fun DownloadChapterRow(
         }
         when (entity?.status) {
             null, DownloadStatus.FAILED -> {
-                // Download button
                 IconButton(onClick = onDownload) {
                     Icon(
                         Icons.Default.Download,
@@ -535,7 +680,6 @@ private fun DownloadChapterRow(
                 }
             }
             DownloadStatus.QUEUED, DownloadStatus.DOWNLOADING -> {
-                // Cancel button — delete also cancels WorkManager
                 IconButton(onClick = onDelete) {
                     Icon(
                         Icons.Default.Close,
@@ -545,7 +689,6 @@ private fun DownloadChapterRow(
                 }
             }
             DownloadStatus.COMPLETED -> {
-                // Delete button
                 IconButton(onClick = onDelete) {
                     Icon(
                         Icons.Default.Delete,
@@ -558,7 +701,6 @@ private fun DownloadChapterRow(
     }
 }
 
-// DateTimeFormatter is immutable and thread-safe — declare once, reuse forever.
 private val CHAPTER_DATE_FORMATTER: java.time.format.DateTimeFormatter =
     java.time.format.DateTimeFormatter.ofPattern("MMM d, yyyy", java.util.Locale.ENGLISH)
 

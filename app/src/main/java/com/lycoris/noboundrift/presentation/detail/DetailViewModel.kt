@@ -23,6 +23,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -49,6 +50,18 @@ sealed interface DetailUiState {
     data class Error(val message: String) : DetailUiState
 }
 
+enum class SourceSwitcherStep { PICK_SOURCE, SEARCH }
+
+data class SourceSwitcherState(
+    val step: SourceSwitcherStep = SourceSwitcherStep.PICK_SOURCE,
+    val targetSourceId: Long = -1L,
+    val targetSourceName: String = "",
+    val query: String = "",
+    val results: List<MangaPreview> = emptyList(),
+    val isSearching: Boolean = false,
+    val searchError: String? = null,
+)
+
 @HiltViewModel
 class DetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
@@ -63,18 +76,41 @@ class DetailViewModel @Inject constructor(
     private val sourceManager: SourceManager,
 ) : ViewModel() {
 
-    val sourceId: Long = checkNotNull(savedStateHandle[Screen.Detail.ARG_SOURCE_ID])
-    private val mangaUrl: String =
+    private val initialSourceId: Long = checkNotNull(savedStateHandle[Screen.Detail.ARG_SOURCE_ID])
+    private val initialMangaUrl: String =
         checkNotNull(savedStateHandle.get<String>(Screen.Detail.ARG_URL)).decodeFromNav()
 
-    /** Human-readable name of the source this manga was fetched from (e.g. "MangaDex"). */
-    val sourceName: String = runCatching { sourceManager.getSource(sourceId).name }.getOrDefault("")
+    // Mutable so they update after a source switch without recreating the ViewModel.
+    private var activeSourceId: Long = initialSourceId
+    private var activeMangaUrl: String = initialMangaUrl
+
+    val sourceId: Long get() = activeSourceId
+
+    /** Human-readable name of the currently active source. */
+    val sourceName: String get() = runCatching { sourceManager.getSource(activeSourceId).name }.getOrDefault("")
+
+    /** True when the active source is permanently unreachable — skip the network entirely. */
+    val isSourceOffline: Boolean get() = activeSourceId == 3L
+
+    /**
+     * Sources available as switch targets: all registered sources except the current one
+     * and any permanently offline source (Manhwaz, id=3).
+     */
+    val switchSources: List<Pair<Long, String>>
+        get() = sourceManager.getAllSources()
+            .filter { it.id != activeSourceId && it.id != 3L }
+            .sortedBy { it.name }
+            .map { it.id to it.name }
 
     private val _uiState = MutableStateFlow<DetailUiState>(DetailUiState.Loading)
     val uiState: StateFlow<DetailUiState> = _uiState.asStateFlow()
 
+    private val _sourceSwitcher = MutableStateFlow<SourceSwitcherState?>(null)
+    val sourceSwitcher: StateFlow<SourceSwitcherState?> = _sourceSwitcher.asStateFlow()
+
     private var loadJob: Job? = null
     private var observersJob: Job? = null
+    private var searchJob: Job? = null
 
     init {
         loadDetail()
@@ -99,7 +135,6 @@ class DetailViewModel @Inject constructor(
         viewModelScope.launch {
             val preview = state.manga.toPreview()
             toggleLibrary(preview, state.isInLibrary)
-            // Room Flow collector will update isInLibrary within one write cycle; no optimistic update needed.
         }
     }
 
@@ -146,8 +181,75 @@ class DetailViewModel @Inject constructor(
         viewModelScope.launch { cancelAllDownloadsUseCase(mangaId) }
     }
 
-    /** Source IDs whose domains are permanently unreachable — skip the network entirely. */
-    val isSourceOffline: Boolean = sourceId == 3L // Manhwaz
+    // ── Source switcher ───────────────────────────────────────────────────────
+
+    fun openSourceSwitcher() {
+        _sourceSwitcher.value = SourceSwitcherState()
+    }
+
+    fun closeSourceSwitcher() {
+        searchJob?.cancel()
+        _sourceSwitcher.value = null
+    }
+
+    fun goBackToPickSource() {
+        searchJob?.cancel()
+        _sourceSwitcher.update { it?.copy(
+            step = SourceSwitcherStep.PICK_SOURCE,
+            results = emptyList(),
+            isSearching = false,
+            searchError = null,
+        )}
+    }
+
+    fun selectSwitchTarget(sourceId: Long, name: String) {
+        val currentTitle = (_uiState.value as? DetailUiState.Success)?.manga?.title ?: ""
+        _sourceSwitcher.value = SourceSwitcherState(
+            step = SourceSwitcherStep.SEARCH,
+            targetSourceId = sourceId,
+            targetSourceName = name,
+            query = currentTitle,
+        )
+        doSearch(sourceId, currentTitle)
+    }
+
+    fun updateSwitchQuery(query: String) {
+        _sourceSwitcher.update { it?.copy(query = query) }
+        searchJob?.cancel()
+        val targetId = _sourceSwitcher.value?.targetSourceId ?: return
+        searchJob = viewModelScope.launch {
+            delay(500)
+            doSearch(targetId, query)
+        }
+    }
+
+    private fun doSearch(sourceId: Long, query: String) {
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            _sourceSwitcher.update { it?.copy(isSearching = true, searchError = null) }
+            repository.fetchMangaList(sourceId, 1, query)
+                .onSuccess { list ->
+                    _sourceSwitcher.update { it?.copy(results = list, isSearching = false) }
+                }
+                .onFailure { err ->
+                    if (err is CancellationException) throw err
+                    _sourceSwitcher.update { it?.copy(isSearching = false, searchError = err.message ?: "Search failed") }
+                }
+        }
+    }
+
+    fun confirmSourceSwitch(newPreview: MangaPreview) {
+        val oldMangaId = (_uiState.value as? DetailUiState.Success)?.manga?.id ?: return
+        viewModelScope.launch {
+            repository.switchMangaSource(oldMangaId, newPreview)
+            _sourceSwitcher.value = null
+            activeSourceId = newPreview.sourceId
+            activeMangaUrl = newPreview.url
+            loadDetail()
+        }
+    }
+
+    // ── Internal load / observe ───────────────────────────────────────────────
 
     private fun loadDetail() {
         loadJob?.cancel()
@@ -155,19 +257,17 @@ class DetailViewModel @Inject constructor(
         loadJob = viewModelScope.launch {
             _uiState.value = DetailUiState.Loading
             // Dead source: skip the DNS lookup entirely to avoid a 10–30 s timeout.
-            // Show Error immediately so the UI can offer a "Search on MangaDex" CTA.
             if (isSourceOffline) {
                 _uiState.value = DetailUiState.Error("Manhwaz is no longer reachable.")
                 return@launch
             }
-            getMangaDetail(sourceId = sourceId, url = mangaUrl)
+            getMangaDetail(sourceId = activeSourceId, url = activeMangaUrl)
                 .onSuccess { manga ->
-                    // Show metadata immediately while chapters are still loading
                     _uiState.value = DetailUiState.Success(
                         manga = manga,
                         isLoadingChapters = true,
                     )
-                    val chapters = repository.fetchChapterList(sourceId, mangaUrl)
+                    val chapters = repository.fetchChapterList(activeSourceId, activeMangaUrl)
                         .getOrElse { emptyList() }
                     val mangaWithChapters = manga.copy(chapters = chapters)
                     val languages = chapters.map { it.language }.filter { it.isNotBlank() }.distinct().sorted()
@@ -191,9 +291,7 @@ class DetailViewModel @Inject constructor(
                 }
                 .onFailure { throwable ->
                     if (throwable is CancellationException) throw throwable
-                    // Offline fallback: if completed downloads exist for this URL, build
-                    // a minimal detail view from local data so the user can still read.
-                    val offlineChapters = getDownloads.forMangaUrl(mangaUrl)
+                    val offlineChapters = getDownloads.forMangaUrl(activeMangaUrl)
                     if (offlineChapters.isNotEmpty()) {
                         val first = offlineChapters.first()
                         val offlineManga = Manga(
