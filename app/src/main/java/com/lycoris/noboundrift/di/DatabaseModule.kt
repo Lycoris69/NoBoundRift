@@ -25,8 +25,13 @@ object DatabaseModule {
             NoBoundRiftDatabase::class.java,
             "noboundrift.db",
         )
-            // fallbackToDestructiveMigration is acceptable for personal use during
-            // early development. Replace with explicit migrations before shipping.
+            .addMigrations(
+                NoBoundRiftDatabase.MIGRATION_4_5,
+                NoBoundRiftDatabase.MIGRATION_5_6,
+                NoBoundRiftDatabase.MIGRATION_6_7,
+            )
+            // Fallback for any version gap not covered by explicit migrations above
+            // (e.g. a device that somehow skipped multiple versions).
             .fallbackToDestructiveMigration()
             .build()
 
