@@ -375,7 +375,9 @@ private fun NovelReader(
             .map { lastVisible ->
                 pages.isNotEmpty() && lastVisible >= pages.size - ReaderViewModel.NOVEL_NEAR_END_PARAGRAPHS
             }
-            .distinctUntilChanged()
+            // No distinctUntilChanged: onNearEnd() is idempotent, and re-firing on every scroll step
+            // near the end lets it recover if the first attempt ran before the chapter list
+            // resolved or the next-chapter request failed.
             .collect { nearEnd -> if (nearEnd) onNearEnd() }
     }
 

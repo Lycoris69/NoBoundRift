@@ -252,6 +252,12 @@ class ReaderViewModel @Inject constructor(
         if (readerPreferences.getPreloadMode() == PreloadMode.WIFI_ONLY && !isOnWifi()) return
         if (_uiState.value.isLoading) return   // guard: don't auto-append while initial pages are still loading
         if (_uiState.value.isLoadingNextChapter) return
+        // The chapter list failed earlier (e.g. rate-limited) — try to resolve it again so
+        // auto-load can recover instead of silently staying stuck on this chapter.
+        if (sortedChapters.isEmpty() && resolveJob?.isActive != true) {
+            resolveNextChapter()
+            return
+        }
         val url = nextChapterUrl ?: return
 
         _uiState.update { it.copy(isLoadingNextChapter = true) }
@@ -348,8 +354,10 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
+    private var resolveJob: Job? = null
+
     private fun resolveNextChapter() {
-        viewModelScope.launch {
+        resolveJob = viewModelScope.launch {
             getChapterList(sourceId = sourceId, mangaUrl = mangaUrl)
                 .onSuccess { chapters ->
                     sortedChapters = chapters.sortedBy { it.number }

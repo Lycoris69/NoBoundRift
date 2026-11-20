@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -57,7 +58,10 @@ class FreeWebNovelSource @Inject constructor(
 
     private companion object {
         const val ID_PREFIX = "fwn_"
-        const val CHAPTER_PAGE_CONCURRENCY = 4
+        // The site answers HTTP 429 when hit with many requests at once (seen on page 17 of a
+        // 17-page chapter list) — keep concurrency low and retry with backoff.
+        const val CHAPTER_PAGE_CONCURRENCY = 2
+        const val MAX_ATTEMPTS = 4
         val CHAPTER_NUMBER_REGEX = Regex("chapter[-_ ]*(\\d+)(?:[-.](\\d+))?", RegexOption.IGNORE_CASE)
         val ORDER_STYLE_REGEX = Regex("(?:^|;)\\s*order\\s*:\\s*(\\d+)", RegexOption.IGNORE_CASE)
     }
@@ -157,14 +161,14 @@ class FreeWebNovelSource @Inject constructor(
             val novelUrl = mangaUrl.trimEnd('/')
             val mangaId = ID_PREFIX + slugOf(novelUrl)
 
-            val firstDoc = getDocument(novelUrl)
+            val firstDoc = getDocumentWithRetry(novelUrl)
             val totalPages = firstDoc.selectFirst("#indexListPage")
                 ?.attr("data-total-page")?.toIntOrNull()?.coerceAtLeast(1) ?: 1
 
             val semaphore = Semaphore(CHAPTER_PAGE_CONCURRENCY)
             val otherDocs = coroutineScope {
                 (2..totalPages).map { p ->
-                    async(Dispatchers.IO) { semaphore.withPermit { getDocument("$novelUrl?page=$p") } }
+                    async(Dispatchers.IO) { semaphore.withPermit { getDocumentWithRetry("$novelUrl?page=$p") } }
                 }.awaitAll()
             }
 
@@ -207,7 +211,7 @@ class FreeWebNovelSource @Inject constructor(
     // blocks (`.reader-ad-skip` wrapping an a-ads <iframe>) spliced in between paragraphs.
     override suspend fun fetchPageList(chapterUrl: String): List<Page> =
         withContext(Dispatchers.IO) {
-            val doc = getDocument(chapterUrl)
+            val doc = getDocumentWithRetry(chapterUrl)
             val article = doc.selectFirst("div#article")
                 ?: throw IllegalStateException("Chapter text not found at $chapterUrl")
 
@@ -240,6 +244,24 @@ class FreeWebNovelSource @Inject constructor(
     // ---------------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------------
+
+    /** [getDocument] with linear backoff; the site rate-limits (HTTP 429) bursts of requests. */
+    private suspend fun getDocumentWithRetry(url: String): Document {
+        var attempt = 0
+        while (true) {
+            try {
+                return getDocument(url)
+            } catch (e: IllegalStateException) {
+                // Only HTTP-status failures are retried; 404 etc. will not get better.
+                val retriable = e.message?.let { it.contains("HTTP 429") || it.contains("HTTP 5") } == true
+                if (!retriable || ++attempt >= MAX_ATTEMPTS) throw e
+                delay(700L * attempt)
+            } catch (e: java.io.IOException) {
+                if (++attempt >= MAX_ATTEMPTS) throw e
+                delay(700L * attempt)
+            }
+        }
+    }
 
     private fun String.cleanText(): String =
         replace(' ', ' ').replace(Regex("\\s+"), " ").trim()
