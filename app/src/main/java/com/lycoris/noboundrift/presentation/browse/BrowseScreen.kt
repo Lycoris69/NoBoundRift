@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items as rowItems
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -29,6 +31,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -97,6 +100,13 @@ fun BrowseScreen(
                 allSourceNames = allSourceNames,
                 onSourceSelected = viewModel::selectSource,
             )
+            if (uiState.genres.isNotEmpty()) {
+                GenreChips(
+                    genres = uiState.genres,
+                    selected = uiState.selectedGenre,
+                    onSelected = viewModel::onGenreSelected,
+                )
+            }
         }
 
         // Pull-to-refresh wraps all content below the search bar.
@@ -159,6 +169,36 @@ private fun DiscoverModeHeader(title: String, onExit: () -> Unit) {
         )
         IconButton(onClick = onExit) {
             Icon(Icons.Default.Close, contentDescription = "Exit Discover")
+        }
+    }
+}
+
+/** Horizontal genre filter row, shown for sources that expose a genre list (e.g. novels). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GenreChips(
+    genres: List<String>,
+    selected: String?,
+    onSelected: (String?) -> Unit,
+) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        item(key = "all") {
+            FilterChip(
+                selected = selected == null,
+                onClick = { onSelected(null) },
+                label = { Text("All") },
+            )
+        }
+        rowItems(genres, key = { it }) { genre ->
+            FilterChip(
+                selected = selected == genre,
+                onClick = { onSelected(if (selected == genre) null else genre) },
+                label = { Text(genre) },
+            )
         }
     }
 }

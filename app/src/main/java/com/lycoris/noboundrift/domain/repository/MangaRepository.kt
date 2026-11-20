@@ -12,6 +12,9 @@ interface MangaRepository {
 
     suspend fun fetchMangaList(sourceId: Long, page: Int, query: String = ""): Result<List<MangaPreview>>
 
+    /** Genre-filtered catalogue page. Only valid for sources that expose [com.lycoris.noboundrift.data.remote.source.Source.genres]. */
+    suspend fun fetchGenreList(sourceId: Long, page: Int, genre: String): Result<List<MangaPreview>>
+
     // ── Detail ───────────────────────────────────────────────────────────────
 
     suspend fun fetchMangaDetail(sourceId: Long, url: String): Result<Manga>

@@ -18,4 +18,8 @@ class GetMangaListUseCase @Inject constructor(
         page: Int,
         query: String = "",
     ): Result<List<MangaPreview>> = repository.fetchMangaList(sourceId, page, query)
+
+    /** Genre-filtered catalogue page, for sources that expose a genre list. */
+    suspend fun byGenre(sourceId: Long, page: Int, genre: String): Result<List<MangaPreview>> =
+        repository.fetchGenreList(sourceId, page, genre)
 }

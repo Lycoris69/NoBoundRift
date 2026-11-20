@@ -89,6 +89,10 @@ class DetailViewModel @Inject constructor(
     /** Human-readable name of the currently active source. */
     val sourceName: String get() = runCatching { sourceManager.getSource(activeSourceId).name }.getOrDefault("")
 
+    /** True for text (web novel) sources: no chapter downloads, switch targets limited to novel sources. */
+    val isNovelSource: Boolean
+        get() = runCatching { sourceManager.getSource(activeSourceId).isNovel }.getOrDefault(false)
+
     /** True when the active source is permanently unreachable — skip the network entirely. */
     val isSourceOffline: Boolean get() = activeSourceId == 3L
 
@@ -98,7 +102,7 @@ class DetailViewModel @Inject constructor(
      */
     val switchSources: List<Pair<Long, String>>
         get() = sourceManager.getAllSources()
-            .filter { it.id != activeSourceId && it.id != 3L }
+            .filter { it.id != activeSourceId && it.id != 3L && it.isNovel == isNovelSource }
             .sortedBy { it.name }
             .map { it.id to it.name }
 

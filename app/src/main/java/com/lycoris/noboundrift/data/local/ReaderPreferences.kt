@@ -23,6 +23,11 @@ class ReaderPreferences @Inject constructor(private val prefs: SharedPreferences
         const val KEY_KEEP_SCREEN_ON = "keep_screen_on"
         val DEFAULT_READING_DIRECTION = ReadingDirection.LTR
         const val DEFAULT_KEEP_SCREEN_ON = false
+
+        const val KEY_NOVEL_FONT_SIZE = "novel_font_size"
+        const val DEFAULT_NOVEL_FONT_SIZE = 18
+        const val MIN_NOVEL_FONT_SIZE = 12
+        const val MAX_NOVEL_FONT_SIZE = 32
     }
 
     fun getPreloadMode(): PreloadMode =
@@ -72,6 +77,24 @@ class ReaderPreferences @Inject constructor(private val prefs: SharedPreferences
         trySend(getKeepScreenOn())
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == KEY_KEEP_SCREEN_ON) trySend(getKeepScreenOn())
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }.distinctUntilChanged()
+
+    /** Text size (sp) used by the novel reader. */
+    fun getNovelFontSize(): Int =
+        prefs.getInt(KEY_NOVEL_FONT_SIZE, DEFAULT_NOVEL_FONT_SIZE)
+            .coerceIn(MIN_NOVEL_FONT_SIZE, MAX_NOVEL_FONT_SIZE)
+
+    fun setNovelFontSize(sizeSp: Int) {
+        prefs.edit().putInt(KEY_NOVEL_FONT_SIZE, sizeSp.coerceIn(MIN_NOVEL_FONT_SIZE, MAX_NOVEL_FONT_SIZE)).apply()
+    }
+
+    fun observeNovelFontSize(): Flow<Int> = callbackFlow {
+        trySend(getNovelFontSize())
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == KEY_NOVEL_FONT_SIZE) trySend(getNovelFontSize())
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
         awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }

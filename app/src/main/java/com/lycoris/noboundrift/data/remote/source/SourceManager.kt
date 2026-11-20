@@ -21,6 +21,7 @@ class SourceManager @Inject constructor(
     mgekoSource: MgekoSource,
     mangaKatanaSource: MangaKatanaSource,
     manhwaTopSource: ManhwaTopSource,
+    freeWebNovelSource: FreeWebNovelSource,
 ) {
     private val sources: Map<Long, Source> = listOf(
         mangaReadSource,
@@ -31,6 +32,7 @@ class SourceManager @Inject constructor(
         mgekoSource,
         mangaKatanaSource,
         manhwaTopSource,
+        freeWebNovelSource,
     ).associateBy { it.id }
 
     /**

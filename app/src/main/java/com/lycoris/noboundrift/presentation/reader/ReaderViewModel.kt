@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.lycoris.noboundrift.data.local.PreloadMode
 import com.lycoris.noboundrift.data.local.ReaderPreferences
 import com.lycoris.noboundrift.data.local.ReadingDirection
+import com.lycoris.noboundrift.data.remote.source.SourceManager
 import com.lycoris.noboundrift.domain.model.Chapter
 import com.lycoris.noboundrift.domain.model.Page
 import com.lycoris.noboundrift.domain.repository.MangaRepository
@@ -57,6 +58,10 @@ data class ReaderUiState(
     val chapterProgressPercent: Int = 0,
     val readingDirection: ReadingDirection = ReadingDirection.LTR,
     val keepScreenOn: Boolean = false,
+    /** True for text (web novel) sources: pages are paragraphs, rendered by the novel reader. */
+    val isNovel: Boolean = false,
+    /** Novel reader text size in sp. */
+    val novelFontSize: Int = ReaderPreferences.DEFAULT_NOVEL_FONT_SIZE,
 )
 
 @HiltViewModel
@@ -69,9 +74,19 @@ class ReaderViewModel @Inject constructor(
     private val repository: MangaRepository,
     @ApplicationContext private val appContext: Context,
     private val readerPreferences: ReaderPreferences,
+    sourceManager: SourceManager,
 ) : ViewModel() {
 
+    companion object {
+        /** Image pages: start loading the next chapter when this close to the end. */
+        const val IMAGE_NEAR_END_PAGES = 3
+        /** Novel paragraphs: preload earlier — a paragraph is only a few lines, and text is cheap. */
+        const val NOVEL_NEAR_END_PARAGRAPHS = 15
+    }
+
     private val sourceId: Long = checkNotNull(savedStateHandle[Screen.Reader.ARG_SOURCE_ID])
+    private val isNovel: Boolean = runCatching { sourceManager.getSource(sourceId).isNovel }.getOrDefault(false)
+    private val nearEndWindow: Int = if (isNovel) NOVEL_NEAR_END_PARAGRAPHS else IMAGE_NEAR_END_PAGES
     private val mangaUrl: String =
         checkNotNull(savedStateHandle.get<String>(Screen.Reader.ARG_MANGA_ID)).decodeFromNav()
     private val chapterUrl: String =
@@ -85,6 +100,8 @@ class ReaderViewModel @Inject constructor(
             currentChapterUrl = chapterUrl,
             readingDirection = readerPreferences.getReadingDirection(),
             keepScreenOn = readerPreferences.getKeepScreenOn(),
+            isNovel = isNovel,
+            novelFontSize = readerPreferences.getNovelFontSize(),
         )
     )
     val uiState: StateFlow<ReaderUiState> = _uiState.asStateFlow()
@@ -112,6 +129,11 @@ class ReaderViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            readerPreferences.observeNovelFontSize().collect { size ->
+                _uiState.update { it.copy(novelFontSize = size) }
+            }
+        }
+        viewModelScope.launch {
             readerPreferences.observeKeepScreenOn().collect { keepOn ->
                 _uiState.update { it.copy(keepScreenOn = keepOn) }
             }
@@ -124,6 +146,8 @@ class ReaderViewModel @Inject constructor(
 
     fun setReadingDirection(dir: ReadingDirection) { readerPreferences.setReadingDirection(dir) }
     fun setKeepScreenOn(enabled: Boolean) { readerPreferences.setKeepScreenOn(enabled) }
+    fun increaseNovelFontSize() { readerPreferences.setNovelFontSize(_uiState.value.novelFontSize + 2) }
+    fun decreaseNovelFontSize() { readerPreferences.setNovelFontSize(_uiState.value.novelFontSize - 2) }
 
     fun toggleChrome() {
         _uiState.update { it.copy(showChrome = !it.showChrome) }
@@ -301,7 +325,8 @@ class ReaderViewModel @Inject constructor(
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
-                                error = "No pages found. This chapter may require a premium subscription.",
+                                error = if (isNovel) "No text found for this chapter."
+                                else "No pages found. This chapter may require a premium subscription.",
                             )
                         }
                     } else {
@@ -344,7 +369,7 @@ class ReaderViewModel @Inject constructor(
                     if (nextChapterUrl != null &&
                         state.pages.isNotEmpty() &&
                         !state.isLoadingNextChapter &&
-                        state.currentPageIndex >= state.pages.size - 3
+                        state.currentPageIndex >= state.pages.size - nearEndWindow
                     ) {
                         onNearEnd()
                     }
@@ -379,7 +404,7 @@ class ReaderViewModel @Inject constructor(
                     if (nextChapterUrl != null &&
                         state.pages.isNotEmpty() &&
                         !state.isLoadingNextChapter &&
-                        state.currentPageIndex >= state.pages.size - 3
+                        state.currentPageIndex >= state.pages.size - nearEndWindow
                     ) {
                         onNearEnd()
                     }

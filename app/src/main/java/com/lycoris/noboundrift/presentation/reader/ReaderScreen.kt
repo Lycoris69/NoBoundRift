@@ -10,7 +10,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,6 +39,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.ViewDay
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -42,6 +48,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -65,10 +72,12 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImagePainter
@@ -77,6 +86,7 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Dimension
 import coil.size.Size as CoilSize
+import com.lycoris.noboundrift.data.local.ReaderPreferences
 import com.lycoris.noboundrift.data.local.ReadingDirection
 import com.lycoris.noboundrift.domain.model.Chapter
 import com.lycoris.noboundrift.domain.model.Page
@@ -176,7 +186,19 @@ fun ReaderScreen(
                     onClick = viewModel::toggleChrome,
                 )
 
-                when (uiState.readerMode) {
+                if (uiState.isNovel) {
+                    // Text reader: one continuous scroll, chapters auto-append like webtoon mode.
+                    key(uiState.chapterKey) {
+                        NovelReader(
+                            pages = uiState.pages,
+                            fontSizeSp = uiState.novelFontSize,
+                            isLoadingNextChapter = uiState.isLoadingNextChapter,
+                            onPageVisible = viewModel::onPageChanged,
+                            onNearEnd = viewModel::onNearEnd,
+                            modifier = centerClickModifier,
+                        )
+                    }
+                } else when (uiState.readerMode) {
                     ReaderMode.WEBTOON -> key(uiState.chapterKey) {
                         WebtoonReader(
                             pages = uiState.pages,
@@ -222,6 +244,10 @@ fun ReaderScreen(
                         onNextChapter = viewModel::goToNextChapter,
                         onRetryImages = viewModel::retryImages,
                         onChapterSelect = viewModel::jumpToChapter,
+                        isNovel = uiState.isNovel,
+                        novelFontSize = uiState.novelFontSize,
+                        onFontSmaller = viewModel::decreaseNovelFontSize,
+                        onFontLarger = viewModel::increaseNovelFontSize,
                     )
                 }
             }
@@ -302,6 +328,106 @@ private fun WebtoonReader(
                         modifier = Modifier.size(36.dp),
                         color = Color.White,
                     )
+                }
+            }
+        }
+    }
+}
+
+// ── Novel (text) ───────────────────────────────────────────────────────────
+
+/**
+ * Continuous text reader. Each [Page] is one paragraph ([Page.text]); chapter headings are
+ * flagged with [Page.isHeading]. Position tracking and next-chapter auto-load reuse the same
+ * viewport-centre / near-end mechanics as [WebtoonReader], so chapter segments, the progress
+ * percentage and read-marking all work unchanged.
+ */
+@Composable
+private fun NovelReader(
+    pages: List<Page>,
+    fontSizeSp: Int,
+    isLoadingNextChapter: Boolean,
+    onPageVisible: (Int) -> Unit,
+    onNearEnd: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            val layout = listState.layoutInfo
+            val viewportCenter = (layout.viewportStartOffset + layout.viewportEndOffset) / 2
+            layout.visibleItemsInfo
+                .minByOrNull { item -> kotlin.math.abs((item.offset + item.size / 2) - viewportCenter) }
+                ?.index
+        }
+            .filterNotNull()
+            .distinctUntilChanged()
+            .collect { onPageVisible(it) }
+    }
+
+    LaunchedEffect(listState, pages.size) {
+        snapshotFlow {
+            val info = listState.layoutInfo.visibleItemsInfo
+            if (info.isEmpty()) null else info.last().index
+        }
+            .filterNotNull()
+            .map { lastVisible ->
+                pages.isNotEmpty() && lastVisible >= pages.size - ReaderViewModel.NOVEL_NEAR_END_PARAGRAPHS
+            }
+            .distinctUntilChanged()
+            .collect { nearEnd -> if (nearEnd) onNearEnd() }
+    }
+
+    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val navBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val textColor = Color(0xFFD8D8D8)
+
+    LazyColumn(
+        state = listState,
+        contentPadding = PaddingValues(
+            start = 20.dp,
+            end = 20.dp,
+            top = statusBar + 56.dp,
+            bottom = navBar + 48.dp,
+        ),
+        modifier = modifier.fillMaxSize(),
+    ) {
+        itemsIndexed(pages, key = { _, page -> page.index }) { _, page ->
+            val text = page.text.orEmpty()
+            if (page.isHeading) {
+                Text(
+                    text = text,
+                    color = Color.White,
+                    fontSize = (fontSizeSp + 4).sp,
+                    lineHeight = ((fontSizeSp + 4) * 1.35f).sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        // Visually separates auto-appended chapters from the previous one.
+                        .padding(top = if (page.index == 0) 0.dp else 48.dp, bottom = 16.dp),
+                )
+            } else {
+                Text(
+                    text = text,
+                    color = textColor,
+                    fontSize = fontSizeSp.sp,
+                    lineHeight = (fontSizeSp * 1.6f).sp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = (fontSizeSp * 0.7f).dp),
+                )
+            }
+        }
+        if (isLoadingNextChapter) {
+            item(key = "next-chapter-loader") {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 24.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(36.dp), color = Color.White)
                 }
             }
         }
@@ -484,6 +610,10 @@ private fun ReaderTopBar(
     onNextChapter: () -> Unit,
     onRetryImages: () -> Unit,
     onChapterSelect: (String) -> Unit,
+    isNovel: Boolean = false,
+    novelFontSize: Int = 18,
+    onFontSmaller: () -> Unit = {},
+    onFontLarger: () -> Unit = {},
 ) {
     var showChapterPicker by remember { mutableStateOf(false) }
     val chapterScrollState = rememberScrollState()
@@ -583,20 +713,44 @@ private fun ReaderTopBar(
                 tint = Color.White.copy(alpha = if (canGoToNextChapter) 1f else 0.4f),
             )
         }
-        IconButton(onClick = onToggleMode) {
-            Icon(
-                imageVector = if (readerMode == ReaderMode.WEBTOON) Icons.Default.SwapHoriz
-                else Icons.Default.ViewDay,
-                contentDescription = "Toggle reader mode",
-                tint = Color.White,
-            )
-        }
-        IconButton(onClick = onRetryImages) {
-            Icon(
-                imageVector = Icons.Default.Refresh,
-                contentDescription = "Retry failed images",
-                tint = Color.White,
-            )
+        if (isNovel) {
+            // Novels have no webtoon/page-flip modes or images — offer text size instead.
+            Box {
+                var showFontMenu by remember { mutableStateOf(false) }
+                IconButton(onClick = { showFontMenu = true }) {
+                    Icon(Icons.Default.TextFields, contentDescription = "Text size", tint = Color.White)
+                }
+                DropdownMenu(expanded = showFontMenu, onDismissRequest = { showFontMenu = false }) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                    ) {
+                        TextButton(onClick = onFontSmaller, enabled = novelFontSize > ReaderPreferences.MIN_NOVEL_FONT_SIZE) {
+                            Text("A−", style = MaterialTheme.typography.titleMedium)
+                        }
+                        Text("$novelFontSize sp", style = MaterialTheme.typography.bodyMedium)
+                        TextButton(onClick = onFontLarger, enabled = novelFontSize < ReaderPreferences.MAX_NOVEL_FONT_SIZE) {
+                            Text("A+", style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
+                }
+            }
+        } else {
+            IconButton(onClick = onToggleMode) {
+                Icon(
+                    imageVector = if (readerMode == ReaderMode.WEBTOON) Icons.Default.SwapHoriz
+                    else Icons.Default.ViewDay,
+                    contentDescription = "Toggle reader mode",
+                    tint = Color.White,
+                )
+            }
+            IconButton(onClick = onRetryImages) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Retry failed images",
+                    tint = Color.White,
+                )
+            }
         }
     }
 }

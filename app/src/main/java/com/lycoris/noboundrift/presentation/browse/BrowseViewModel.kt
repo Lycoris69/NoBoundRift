@@ -51,6 +51,10 @@ data class BrowseUiState(
     val blurCovers: Boolean = false,
     /** ID of the currently selected source, mirrored here for the source-picker UI. */
     val currentSourceId: Long = 0L,
+    /** Genre filter options of the active source (empty when it has none). */
+    val genres: List<String> = emptyList(),
+    /** Active genre filter, or null for the plain catalogue. Ignored while a search query is set. */
+    val selectedGenre: String? = null,
 )
 
 @HiltViewModel
@@ -102,7 +106,7 @@ class BrowseViewModel @Inject constructor(
                     initialized = true
                     sourceId = newSourceId
                     val showDates = runCatching { sourceManager.getSource(newSourceId).providesLatestDates }.getOrDefault(true)
-                    _uiState.update { it.copy(showDateGroups = showDates, currentSourceId = newSourceId) }
+                    _uiState.update { it.copy(showDateGroups = showDates, currentSourceId = newSourceId, genres = genresOf(newSourceId)) }
                     if (altTitles.isNotEmpty()) {
                         val allTitles = (listOf(initialQuery) + altTitles).filter { it.isNotBlank() }.distinct()
                         launchMultiTitleSearch(allTitles)
@@ -115,11 +119,41 @@ class BrowseViewModel @Inject constructor(
                     loadJob?.cancel()
                     crossSourceJob?.cancel()
                     val showDates = runCatching { sourceManager.getSource(newSourceId).providesLatestDates }.getOrDefault(true)
-                    _uiState.update { BrowseUiState(searchQuery = it.searchQuery, showDateGroups = showDates, currentSourceId = newSourceId) }
+                    _uiState.update {
+                        BrowseUiState(
+                            searchQuery = it.searchQuery,
+                            showDateGroups = showDates,
+                            currentSourceId = newSourceId,
+                            genres = genresOf(newSourceId),
+                        )
+                    }
                     loadPage(page = 1)
                 }
             }
         }
+    }
+
+    private fun genresOf(id: Long): List<String> =
+        runCatching { sourceManager.getSource(id).genres }.getOrDefault(emptyList())
+
+    /** Applies (or clears, with null) the genre filter. Selecting a genre clears any search text. */
+    fun onGenreSelected(genre: String?) {
+        searchJob?.cancel()
+        loadJob?.cancel()
+        crossSourceJob?.cancel()
+        enrichJob?.cancel()
+        _uiState.update {
+            it.copy(
+                selectedGenre = genre,
+                searchQuery = "",
+                manga = emptyList(),
+                currentPage = 1,
+                canLoadMore = true,
+                error = null,
+                isCrossSourceSearch = false,
+            )
+        }
+        loadPage(page = 1)
     }
 
     fun loadNextPage() {
@@ -166,6 +200,8 @@ class BrowseViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 searchQuery = query,
+                // A typed query takes over from the genre filter; clearing it returns to the catalogue.
+                selectedGenre = if (query.isNotBlank()) null else it.selectedGenre,
                 manga = emptyList(),
                 currentPage = 1,
                 canLoadMore = true,
@@ -231,6 +267,7 @@ class BrowseViewModel @Inject constructor(
         // coroutine always uses the query that was current at call-site, not whatever
         // the user has typed by the time the coroutine is scheduled.
         val querySnapshot = _uiState.value.searchQuery
+        val genreSnapshot = _uiState.value.selectedGenre?.takeIf { querySnapshot.isBlank() }
 
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
@@ -240,11 +277,12 @@ class BrowseViewModel @Inject constructor(
                 _uiState.update { it.copy(isLoadingMore = true) }
             }
 
-            getMangaList(
-                sourceId = sourceId,
-                page = page,
-                query = querySnapshot,
-            )
+            val result = if (genreSnapshot != null) {
+                getMangaList.byGenre(sourceId = sourceId, page = page, genre = genreSnapshot)
+            } else {
+                getMangaList(sourceId = sourceId, page = page, query = querySnapshot)
+            }
+            result
                 .onSuccess { newItems ->
                     _uiState.update { state ->
                         val combined = if (page == 1) newItems else state.manga + newItems
@@ -298,7 +336,10 @@ class BrowseViewModel @Inject constructor(
         crossSourceJob?.cancel()
         crossSourceJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            val otherSources = sourceManager.getAllSources().filter { it.id != sourceId }
+            // Never mix content types: a novel search must not surface manga and vice-versa.
+            val currentIsNovel = runCatching { sourceManager.getSource(sourceId).isNovel }.getOrDefault(false)
+            val otherSources = sourceManager.getAllSources()
+                .filter { it.id != sourceId && it.isNovel == currentIsNovel }
             val deferreds = otherSources.map { source ->
                 async {
                     runCatching {
@@ -325,7 +366,8 @@ class BrowseViewModel @Inject constructor(
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null, isCrossSourceSearch = true) }
-            val allSources = sourceManager.getAllSources()
+            // Discover recommendations come from AniList (manga/manhwa) — skip novel sources.
+            val allSources = sourceManager.getAllSources().filter { !it.isNovel }
             val deferreds = allSources.flatMap { source ->
                 titles.map { title ->
                     async {

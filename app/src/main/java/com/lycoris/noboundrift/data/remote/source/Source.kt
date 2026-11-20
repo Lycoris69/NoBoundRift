@@ -31,6 +31,20 @@ interface Source {
     val providesLatestDates: Boolean get() = true
 
     /**
+     * True for text-based sources (web novels). [fetchPageList] then returns one [Page] per
+     * paragraph (with [Page.text] set and an empty [Page.imageUrl]) instead of image URLs,
+     * which lets the reader reuse the same chapter auto-load / progress machinery.
+     * Novel sources do not support chapter downloads.
+     */
+    val isNovel: Boolean get() = false
+
+    /** Genre names offered as a browse filter. Empty = the source has no genre browsing. */
+    val genres: List<String> get() = emptyList()
+
+    /** Returns a page of entries for [genre] (one of [genres]). Only called when [genres] is non-empty. */
+    suspend fun fetchGenreList(page: Int, genre: String): List<MangaPreview> = emptyList()
+
+    /**
      * Returns a page of manga entries from the source's catalogue or search results.
      * @param page 1-based page number.
      * @param query Optional search query. When blank, returns the catalogue browse order.

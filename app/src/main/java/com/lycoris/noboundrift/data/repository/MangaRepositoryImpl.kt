@@ -39,6 +39,11 @@ class MangaRepositoryImpl @Inject constructor(
             sourceManager.getSource(sourceId).fetchMangaList(page, query)
         }
 
+    override suspend fun fetchGenreList(sourceId: Long, page: Int, genre: String): Result<List<MangaPreview>> =
+        resultCatching {
+            sourceManager.getSource(sourceId).fetchGenreList(page, genre)
+        }
+
     // ── Detail ───────────────────────────────────────────────────────────────
 
     override suspend fun fetchMangaDetail(sourceId: Long, url: String): Result<Manga> =

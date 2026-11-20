@@ -178,7 +178,8 @@ fun DetailScreen(
                         lastReadChapterUrl = state.lastReadChapterUrl,
                         availableLanguages = state.availableLanguages,
                         selectedLanguage = state.selectedLanguage,
-                        selectedTab = state.selectedTab,
+                        selectedTab = if (viewModel.isNovelSource) DetailTab.CHAPTERS else state.selectedTab,
+                        supportsDownloads = !viewModel.isNovelSource,
                         downloads = state.downloads,
                         onTabSelect = viewModel::setTab,
                         onToggleOrder = viewModel::toggleChapterOrder,
@@ -321,6 +322,7 @@ private fun MangaDetail(
     availableLanguages: List<String>,
     selectedLanguage: String,
     selectedTab: DetailTab,
+    supportsDownloads: Boolean = true,
     downloads: Map<String, DownloadEntity>,
     onTabSelect: (DetailTab) -> Unit,
     onToggleOrder: () -> Unit,
@@ -460,8 +462,8 @@ private fun MangaDetail(
             }
         }
 
-        // Tab row — Chapters / Downloads
-        item {
+        // Tab row — Chapters / Downloads (novels have no downloads, so no tabs)
+        if (supportsDownloads) item {
             TabRow(selectedTabIndex = selectedTab.ordinal) {
                 DetailTab.entries.forEach { tab ->
                     Tab(
